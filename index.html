@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner Local Offline</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        :root {
+            --primary: #25D366; /* Verde WhatsApp para el estilo */
+            --dark: #121b22;
+            --light: #f0f2f5;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: var(--light);
+            color: var(--dark);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        header {
+            background-color: var(--dark);
+            color: white;
+            width: 100%;
+            text-align: center;
+            padding: 15px 0;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .container {
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .btn-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button, label.btn-label {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        button:active, label.btn-label:active {
+            transform: scale(0.98);
+        }
+        .btn-block {
+            grid-column: span 2;
+            background-color: #007bff;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        /* Vista previa de las hojas */
+        .workspace {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        .page-card {
+            background: white;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+        .img-container {
+            overflow: hidden;
+            width: 100%;
+            max-height: 350px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #eaeaea;
+            border-radius: 4px;
+        }
+        .page-card img {
+            max-width: 100%;
+            max-height: 350px;
+            transition: transform 0.2s ease;
+            object-fit: contain;
+        }
+        .controls-card {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            margin-top: 10px;
+            gap: 5px;
+        }
+        .btn-action {
+            padding: 6px 12px;
+            font-size: 12px;
+            background-color: #6c757d;
+        }
+        .btn-danger { background-color: #dc3545; }
+        .btn-zoom { background-color: #ffc107; color: black; }
+    </style>
+</head>
+<body>
+
+    <header>Scanner PDF Local & Offline</header>
+
+    <div class="container">
+        <div class="btn-group">
+            <label class="btn-label">
+                📷 Capturar Foto
+                <input type="file" accept="image/*" capture="environment" id="cameraInput">
+            </label>
+            
+            <label class="btn-label" style="background-color: #2b7a78;">
+                🖼️ Galería / Archivos
+                <input type="file" accept="image/*" multiple id="galleryInput">
+            </label>
+
+            <button class="btn-block" id="btnExportar" disabled>
+                ⚙️ Generar y Descargar PDF
+            </button>
+        </div>
+
+        <h3>Documento actual (Hojas en cola)</h3>
+        <div class="workspace" id="workspace">
+            </div>
+    </div>
+
+    <script>
+        const { jsPDF } = window.jspdf;
+        let documentoHojas = []; // Array local para guardar las imágenes y su estado (rotación, zoom)
+
+        const cameraInput = document.getElementById('cameraInput');
+        const galleryInput = document.getElementById('galleryInput');
+        const workspace = document.getElementById('workspace');
+        const btnExportar = document.getElementById('btnExportar');
+
+        // Escuchar capturas y selecciones
+        cameraInput.addEventListener('change', (e) => procesarArchivos(e.target.files));
+        galleryInput.addEventListener('change', (e) => procesarArchivos(e.target.files));
+
+        function procesarArchivos(files) {
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const hoja = {
+                        id: Date.now() + Math.random(),
+                        src: event.target.result,
+                        rotation: 0,
+                        zoom: 1
+                    };
+                    documentoHojas.push(hoja);
+                    renderizarDocumento();
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Renderiza la interfaz con soporte para rotar, zoom y borrar hojas
+        function renderizarDocumento() {
+            workspace.innerHTML = '';
+            
+            if(documentoHojas.length === 0) {
+                workspace.innerHTML = '<p style="text-align:center; color:#888;">No hay hojas cargadas. Capturá una foto o elegí desde tu galería.</p>';
+                btnExportar.disabled = true;
+                return;
+            }
+            
+            btnExportar.disabled = false;
+
+            documentoHojas.forEach((hoja, index) => {
+                const card = document.createElement('div');
+                card.className = 'page-card';
+                
+                card.innerHTML = `
+                    <div style="font-size:12px; margin-bottom:5px; font-weight:bold; color:#666;">Pág. ${index + 1}</div>
+                    <div class="img-container">
+                        <img src="${hoja.src}" id="img-${hoja.id}" style="transform: rotate(${hoja.rotation}deg) scale(${hoja.zoom});">
+                    </div>
+                    <div class="controls-card">
+                        <button class="btn-action" onclick="rotar(${hoja.id})">🔄 Rotar 90°</button>
+                        <button class="btn-action btn-zoom" onclick="hacerZoom(${hoja.id})">🔍 Zoom (${hoja.zoom}x)</button>
+                        <button class="btn-action btn-danger" onclick="eliminarHoja(${hoja.id})">🗑️ Borrar</button>
+                    </div>
+                `;
+                workspace.appendChild(card);
+            });
+        }
+
+        // Funciones de edición locales rápidas
+        window.rotar = function(id) {
+            const hoja = documentoHojas.find(h => h.id === id);
+            hoja.rotation = (hoja.rotation + 90) % 360;
+            renderizarDocumento();
+        };
+
+        window.hacerZoom = function(id) {
+            const hoja = documentoHojas.find(h => h.id === id);
+            hoja.zoom = hoja.zoom === 1 ? 1.5 : hoja.zoom === 1.5 ? 2 : 1; // Alterna tres niveles de zoom visual continuo
+            renderizarDocumento();
+        };
+
+        window.eliminarHoja = function(id) {
+            documentoHojas = documentoHojas.filter(h => h.id !== id);
+            renderizarDocumento();
+        };
+
+        // Compilación final del PDF 100% del lado del cliente
+        btnExportar.addEventListener('click', async () => {
+            btnExportar.innerText = "Procesando de forma local...";
+            btnExportar.disabled = true;
+
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = pdf.internal.pageSize.getHeight();
+
+            for (let i = 0; i < documentoHojas.length; i++) {
+                if (i > 0) pdf.addPage();
+                
+                const hoja = documentoHojas[i];
+                
+                // Enfoque nativo con Canvas para incrustar la imagen respetando la rotación final elegida
+                const img = await cargarImagenConRotacion(hoja.src, hoja.rotation);
+                pdf.addImage(img, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+            }
+
+            // Descarga local directa en Windows o disparador de almacenamiento en iOS/Android
+            pdf.save('documento_escaneado.pdf');
+            
+            btnExportar.innerText = "⚙️ Generar y Descargar PDF";
+            btnExportar.disabled = false;
+        });
+
+        // Auxiliar técnico para rotar el bitmap internamente antes de inyectar al PDF
+        function cargarImagenConRotacion(src, rotation) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = function() {
+                    if (rotation === 0) {
+                        resolve(src);
+                        return;
+                    }
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    if (rotation === 90 || rotation === 270) {
+                        canvas.width = img.height;
+                        canvas.height = img.width;
+                    } else {
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                    }
+                    
+                    ctx.translate(canvas.width / 2, canvas.height / 2);
+                    ctx.rotate((rotation * Math.PI) / 180);
+                    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+                    
+                    resolve(canvas.toDataURL('image/jpeg', 0.9));
+                };
+                img.src = src;
+            });
+        }
+    </script>
+</body>
+</html>
