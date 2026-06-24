@@ -3,188 +3,226 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scanner Local Avanzado</title>
+    <title>DS Scanner PDF Pro 100% local</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         :root {
             --primary: #25D366;
             --dark: #121b22;
             --light: #f0f2f5;
+            --accent: #007bff;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: var(--light);
-            color: var(--dark);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            margin: 0; padding: 0; background-color: var(--light); color: var(--dark);
+            display: flex; flex-direction: column; height: 100vh; overflow: hidden;
         }
         header {
-            background-color: var(--dark);
-            color: white;
-            width: 100%;
-            text-align: center;
-            padding: 15px 0;
-            font-weight: bold;
+            background-color: var(--dark); color: white; width: 100%; text-align: center;
+            padding: 10px 0; font-weight: bold; font-size: 16px; flex-shrink: 0;
         }
-        .container {
-            width: 100%;
-            max-width: 550px;
-            padding: 20px;
-            box-sizing: border-box;
+        .main-layout { display: flex; width: 100%; height: calc(100vh - 41px); box-sizing: border-box; }
+        
+        .sidebar {
+            width: 40%; max-width: 450px; min-width: 320px; background: white;
+            border-right: 1px solid #cbd5e1; display: flex; flex-direction: column; box-sizing: border-box;
         }
-        .btn-group {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 20px;
+        .sidebar-scroll-content { flex-grow: 1; overflow-y: auto; padding: 15px; }
+
+        .preview-panel {
+            width: 60%; flex-grow: 1; background: #525659; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; position: relative;
         }
+        .pdf-canvas-mock {
+            background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.4); display: flex; align-items: center;
+            justify-content: center; overflow: hidden; position: relative; max-width: 100%; max-height: 100%;
+        }
+        .pdf-canvas-mock img { position: absolute; object-fit: contain; }
+        
+        .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+        .btn-group .btn-label, .btn-group button { flex: 1 1 140px; min-height: 42px; }
         button, label.btn-label {
-            background-color: var(--primary);
-            color: white;
-            border: none;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: bold;
-            cursor: pointer;
-            text-align: center;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.15);
+            background-color: var(--primary); color: white; border: none; padding: 10px;
+            border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; 
+            text-align: center; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
         }
-        input[type="file"] { display: none; }
+        .btn-label input[type="file"] { display: none !important; }
+        .btn-block { width: 100%; background-color: var(--accent); }
         
-        /* Configuración de PDF */
-        .config-panel {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
-        }
-        .config-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-top: 10px;
-        }
-        select {
-            padding: 8px;
-            border-radius: 6px;
-            border: 1px solid #ccc;
-            font-size: 14px;
-            width: 100%;
-        }
+        .config-section { background: #f8f9fa; padding: 10px; border-radius: 6px; margin-bottom: 12px; border: 1px solid #e2e8f0; }
+        .config-section label { font-size: 11px; color: #4a5568; font-weight: bold; }
+        select, input[type="range"] { width: 100%; padding: 6px; margin-top: 2px; margin-bottom: 6px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 12px; box-sizing: border-box; }
+        
+        .editor-local-box { position: relative; width: 100%; background: #000; overflow: hidden; margin-bottom: 10px; display: none; }
+        .editor-local-box img { width: 100%; display: block; user-select: none; }
+        .crop-box { position: absolute; border: 2px dashed #25D366; background: rgba(37, 211, 102, 0.2); box-sizing: border-box; }
+        .handle { position: absolute; width: 12px; height: 12px; background: #25D366; border: 1px solid white; border-radius: 50%; }
+        .tl { top: -6px; left: -6px; } .tr { top: -6px; right: -6px; } .bl { bottom: -6px; left: -6px; } .br { bottom: -6px; right: -6px; }
 
-        /* Área de trabajo */
-        .workspace { display: flex; flex-direction: column; gap: 15px; }
+        .workspace-title { font-size: 13px; font-weight: bold; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px; }
+        .workspace { display: flex; gap: 10px; padding: 10px 0; overflow-x: auto; min-height: 125px; }
+        .workspace.vertical { flex-direction: column; overflow-x: hidden; overflow-y: auto; max-height: 300px; }
+        
         .page-card {
-            background: white;
-            border-radius: 8px;
-            padding: 15px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            background: #f1f5f9; border: 2px solid #cbd5e1; border-radius: 6px; padding: 6px;
+            display: flex; flex-direction: column; align-items: center; min-width: 110px; max-width: 110px; position: relative; cursor: grab; box-sizing: border-box;
         }
+        .page-card.active { border-color: var(--accent); background: #e0f2fe; }
+        .page-card img { max-width: 80px; max-height: 65px; object-fit: contain; pointer-events: none; }
+        .card-actions { display: flex; gap: 4px; margin-top: 5px; width: 100%; }
+        .card-actions button { padding: 4px; font-size: 9px; flex-grow: 1; background: #64748b; }
         
-        /* Contenedor de Ajuste de Área (Crop) */
-        .crop-container {
-            position: relative;
-            margin: 10px 0;
-            max-width: 100%;
-            background: #eee;
-            overflow: hidden;
-        }
-        .crop-container img {
-            max-width: 100%;
-            max-height: 350px;
-            display: block;
-            user-select: none;
-        }
-        /* Recuadro de recorte manual */
-        .crop-box {
-            position: absolute;
-            border: 2px dashed #007bff;
-            background: rgba(0, 123, 255, 0.2);
-            box-sizing: border-box;
-            cursor: move;
-        }
-        /* Esquinas o manejadores para estirar/ajustar extremos */
-        .handle {
-            position: absolute;
-            width: 14px;
-            height: 14px;
-            background: #007bff;
-            border: 2px solid white;
-            border-radius: 50%;
-        }
-        .tl { top: -7px; left: -7px; cursor: nwse-resize; }
-        .tr { top: -7px; right: -7px; cursor: nesw-resize; }
-        .bl { bottom: -7px; left: -7px; cursor: nesw-resize; }
-        .br { bottom: -7px; right: -7px; cursor: nwse-resize; }
+        .about-box { font-size: 10px; color: #64748b; padding: 10px 15px; border-top: 1px solid #e2e8f0; background: #f8f9fa; flex-shrink: 0; }
 
-        .controls-card {
-            display: flex;
-            justify-content: space-around;
-            width: 100%;
-            margin-top: 10px;
-            gap: 5px;
-            flex-wrap: wrap;
+        .camera-modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); z-index: 2000; align-items: center; justify-content: center; flex-direction: column;
         }
-        .btn-action { padding: 6px 12px; font-size: 12px; background-color: #6c757d; }
-        .btn-danger { background-color: #dc3545; }
-        .btn-success { background-color: #28a745; }
-        .btn-block { grid-column: span 2; background-color: #007bff; }
+        .camera-modal video { width: 90%; max-width: 500px; border-radius: 8px; background: black; }
+
+        @media (max-width: 768px) {
+            body { overflow: auto; height: auto; } .main-layout { flex-direction: column; height: auto; }
+            .sidebar { width: 100%; max-width: 100%; height: auto; border-right: none; }
+            .sidebar-scroll-content { overflow-y: visible; } .preview-panel { width: 100%; height: 380px; }
+            .pdf-canvas-mock { width: 240px !important; height: 340px !important; }
+        }
     </style>
 </head>
 <body>
 
-    <header>Scanner PDF Pro - 100% Local</header>
+    <header>DS Scanner PDF Pro 100% local</header>
 
-    <div class="container">
-        <div class="btn-group">
-            <label class="btn-label">📷 Capturar Foto <input type="file" accept="image/*" capture="environment" id="cameraInput"></label>
-            <label class="btn-label" style="background-color: #2b7a78;">🖼️ Galería / Archivos <input type="file" accept="image/*" multiple id="galleryInput"></label>
-        </div>
+    <div class="main-layout">
+        <div class="sidebar">
+            <div class="sidebar-scroll-content">
+                <div class="btn-group">
+                    <button type="button" id="btnCapturaDirecta" onclick="dispararCamaraDispositivo()">📷 Capturar Foto</button>
+                    <input type="file" accept="image/*" capture="environment" id="cameraInput" style="display:none !important;">
+                    
+                    <label class="btn-label" style="background-color: #2b7a78; font-size:13px;">
+                        🖼️ Galería / Archivos 
+                        <input type="file" accept="image/*" multiple id="galleryInput">
+                    </label>
+                </div>
 
-        <div class="config-panel">
-            <strong style="font-size: 15px;">📐 Configuración del Formato PDF:</strong>
-            <div class="config-grid">
-                <div>
-                    <label style="font-size:12px; color:#555;">Tamaño de Hoja:</label>
-                    <select id="pdfTamaño">
-                        <option value="a4">A4</option>
-                        <option value="a3">A3</option>
-                        <option value="legal">Oficio (Legal)</option>
-                        <option value="letter">Carta (Letter)</option>
+                <div class="editor-local-box" id="editorLocalBox">
+                    <img id="editorImg" src="">
+                    <div class="crop-box" id="interactBox">
+                        <div class="handle tl"></div><div class="handle tr"></div>
+                        <div class="handle bl"></div><div class="handle br"></div>
+                    </div>
+                </div>
+                <button id="btnAutoBordes" style="display:none; background:#0f172a; margin-bottom:12px; font-size:11px; padding:6px; width:100%;">✨ Auto-detectar Contornos (IA Local)</button>
+
+                <div class="config-section">
+                    <label>📐 FORMATO HOJA PDF (PARA HOJA ACTIVA):</label>
+                    <div style="display: flex; gap: 8px; margin-top: 4px;">
+                        <select id="pdfTamaño" onchange="guardarCambiosHojaActiva()">
+                            <option value="a4">A4</option>
+                            <option value="a3">A3</option>
+                            <option value="legal">Oficio</option>
+                            <option value="letter">Carta</option>
+                        </select>
+                        <select id="pdfOrientacion" onchange="guardarCambiosHojaActiva()">
+                            <option value="p">Vertical (Retrato)</option>
+                            <option value="l">Horizontal (Apaisado)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="config-section">
+                    <label>🖼️ FORMATO DE CONTENIDO (PARA HOJA ACTIVA):</label>
+                    <select id="tipoContenido" onchange="guardarCambiosHojaActiva()">
+                        <option value="extendido">Tamaño Extendido (Ajustar a la hoja)</option>
+                        <option value="real">Tamaño Real (Aprox. Credencial / DNI)</option>
+                        <option value="ampliado">Tamaño Ampliado (Zoom Manual)</option>
+                    </select>
+                    <div id="wrapperZoomManual" style="display:none; margin-top: 8px;">
+                        <label>🔍 Zoom Manual del Contenido:</label>
+                        <input type="range" id="zoomManual" min="50" max="200" value="100" oninput="guardarCambiosHojaActiva()">
+                    </div>
+                </div>
+
+                <button class="btn-block" id="btnExportar" style="margin-bottom:15px;" disabled>⚙️ Generar y Guardar PDF Final</button>
+
+                <div class="workspace-title">
+                    🗂️ Ordenar Hojas del Proyecto:
+                    <select id="vistaCola" style="width:auto; display:inline; margin-left:10px; padding:2px;" onchange="cambiarVistaCola()">
+                        <option value="horizontal">Vista Horizontal</option>
+                        <option value="vertical">Vista Vertical</option>
                     </select>
                 </div>
-                <div>
-                    <label style="font-size:12px; color:#555;">Orientación:</label>
-                    <select id="pdfOrientacion">
-                        <option value="p">Vertical (Retrato)</option>
-                        <option value="l">Horizontal (Apaisado)</option>
-                    </select>
-                </div>
+                <div class="workspace" id="workspace"></div>
             </div>
-            <button class="btn-block" id="btnExportar" style="margin-top: 15px;" disabled>⚙️ Generar y Guardar PDF</button>
+
+            <div class="about-box">
+                <strong>Producido por Dani Soft</strong> | Ind. Argentina | Versión 1.0<br>
+                <span style="color:#ef4444; font-weight:bold;">Términos legales:</span> Propiedad Intelectual Protegida. Este software opera de manera local. Queda prohibida la copia, reproducción o ingeniería inversa de este código. Todo uso indebido será sancionado penalmente.
+            </div>
         </div>
 
-        <h3>Hojas cargadas (Ajustá los extremos de cada una)</h3>
-        <div class="workspace" id="workspace"></div>
+        <div class="preview-panel">
+            <div style="color:white; font-size:11px; position:absolute; top:10px; left:15px; font-weight:bold; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:4px; z-index:10;">👁️ VISTA PREVIA REAL DEL PDF</div>
+            <div class="pdf-canvas-mock" id="pdfMock">
+                <div id="mockAviso" style="color:#94a3b8; font-size:12px; text-align:center; padding:20px;">No hay contenido para previsualizar.</div>
+                <img id="mockImg" src="" style="display:none;">
+            </div>
+        </div>
     </div>
 
-    <script>
+    <div class="camera-modal" id="cameraModal">
+        <video id="videoStream" autoplay playsinline></video>
+        <div style="margin-top:15px; display:flex; gap:10px;">
+            <button onclick="tomarFotoWebcam()" style="background:#007bff; padding:12px 24px;">📸 Capturar Hoja</button>
+            <button onclick="cerrarModalCamara()" style="background:#dc3545;">❌ Cancelar</button>
+        </div>
+    </div>
+
+    <script {nonce}>
         const { jsPDF } = window.jspdf;
         let documentoHojas = [];
+        let indiceActivo = -1;
+        let localStream = null;
 
-        document.getElementById('cameraInput').addEventListener('change', (e) => procesarArchivos(e.target.files));
-        document.getElementById('galleryInput').addEventListener('change', (e) => procesarArchivos(e.target.files));
+        const cameraInput = document.getElementById('cameraInput');
+        const galleryInput = document.getElementById('galleryInput');
+        cameraInput.addEventListener('change', (e) => procesarArchivos(e.target.files));
+        galleryInput.addEventListener('change', (e) => procesarArchivos(e.target.files));
+
+        function dispararCamaraDispositivo() {
+            if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                cameraInput.click();
+            } else {
+                abrirWebcamPC();
+            }
+        }
+
+        async function abrirWebcamPC() {
+            const modal = document.getElementById('cameraModal');
+            const video = document.getElementById('videoStream');
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
+                });
+                video.srcObject = localStream; modal.style.display = "flex";
+            } catch (err) {
+                alert("No se pudo acceder a la cámara.");
+            }
+        }
+
+        function tomarFotoWebcam() {
+            const video = document.getElementById('videoStream');
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+            inyectarImagenEstructura(canvas.toDataURL('image/jpeg', 0.9), canvas.width, canvas.height);
+            cerrarModalCamara();
+        }
+
+        function cerrarModalCamara() {
+            document.getElementById('cameraModal').style.display = "none";
+            if(localStream) localStream.getTracks().forEach(track => track.stop());
+        }
 
         function procesarArchivos(files) {
             Array.from(files).forEach(file => {
@@ -192,17 +230,7 @@
                 reader.onload = function(event) {
                     const img = new Image();
                     img.onload = function() {
-                        const hoja = {
-                            id: Date.now() + Math.random(),
-                            src: event.target.result,
-                            rotation: 0,
-                            naturalWidth: img.width,
-                            naturalHeight: img.height,
-                            // Extremos iniciales del recorte en porcentaje (0 a 100)
-                            crop: { x: 5, y: 5, w: 90, h: 90 }
-                        };
-                        documentoHojas.push(hoja);
-                        renderizarDocumento();
+                        inyectarImagenEstructura(event.target.result, img.width, img.height);
                     };
                     img.src = event.target.result;
                 };
@@ -210,210 +238,290 @@
             });
         }
 
-        function renderizarDocumento() {
+        function inyectarImagenEstructura(srcBase64, width, height) {
+            const hoja = {
+                id: Date.now() + Math.random(),
+                src: srcBase64,
+                rotation: 0,
+                crop: { x: 0, y: 0, w: 100, h: 100 },
+                widthOriginal: width,
+                heightOriginal: height,
+                pdfTamaño: "a4",
+                pdfOrientacion: "p",
+                tipoContenido: "extendido",
+                zoomManual: 100
+            };
+            documentoHojas.push(hoja);
+            indiceActivo = documentoHojas.length - 1;
+            renderizarColaHojas();
+            cargarEditorImagenActiva();
+        }
+
+        function guardarCambiosHojaActiva() {
+            if (indiceActivo === -1 || !documentoHojas[indiceActivo]) return;
+            const hoja = documentoHojas[indiceActivo];
+            
+            hoja.pdfTamaño = document.getElementById('pdfTamaño').value;
+            hoja.pdfOrientacion = document.getElementById('pdfOrientacion').value;
+            hoja.tipoContenido = document.getElementById('tipoContenido').value;
+            hoja.zoomManual = parseInt(document.getElementById('zoomManual').value);
+
+            // Muestra u oculta el wrapper del slider en tiempo real según la selección
+            document.getElementById('wrapperZoomManual').style.display = (hoja.tipoContenido === 'ampliado') ? "block" : "none";
+
+            actualizarPrevisualizadorGlobal();
+        }
+
+        function sincronizarSelectoresConHojaActiva() {
+            if (indiceActivo === -1 || !documentoHojas[indiceActivo]) return;
+            const hoja = documentoHojas[indiceActivo];
+
+            document.getElementById('pdfTamaño').value = hoja.pdfTamaño;
+            document.getElementById('pdfOrientacion').value = hoja.pdfOrientacion;
+            document.getElementById('tipoContenido').value = hoja.tipoContenido;
+            document.getElementById('zoomManual').value = hoja.zoomManual;
+
+            // Corrección de visibilidad forzada al cambiar de hoja activa
+            document.getElementById('wrapperZoomManual').style.display = (hoja.tipoContenido === 'ampliado') ? "block" : "none";
+        }
+
+        function renderizarColaHojas() {
             const workspace = document.getElementById('workspace');
             const btnExportar = document.getElementById('btnExportar');
             workspace.innerHTML = '';
             
             if(documentoHojas.length === 0) {
-                workspace.innerHTML = '<p style="text-align:center; color:#888;">Ninguna hoja cargada.</p>';
+                workspace.innerHTML = '<p style="font-size:11px; color:#888;">Cola vacía.</p>';
                 btnExportar.disabled = true;
+                document.getElementById('mockAviso').style.display = "block";
+                document.getElementById('mockImg').style.display = "none";
+                document.getElementById('editorLocalBox').style.display = "none";
+                document.getElementById('btnAutoBordes').style.display = "none";
                 return;
             }
             btnExportar.disabled = false;
 
             documentoHojas.forEach((hoja, index) => {
                 const card = document.createElement('div');
-                card.className = 'page-card';
+                card.className = `page-card ${index === indiceActivo ? 'active' : ''}`;
+                card.setAttribute('draggable', true);
+                
+                card.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', index));
+                card.addEventListener('dragover', (e) => e.preventDefault());
+                card.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    const deIndex = parseInt(e.dataTransfer.getData('text/plain'));
+                    const elemento = documentoHojas.splice(deIndex, 1)[0];
+                    documentoHojas.splice(index, 0, elemento);
+                    indiceActivo = index;
+                    renderizarColaHojas();
+                    cargarEditorImagenActiva();
+                });
+
+                card.addEventListener('click', (e) => {
+                    if(e.target.tagName !== 'BUTTON') {
+                        indiceActivo = index;
+                        renderizarColaHojas();
+                        cargarEditorImagenActiva();
+                    }
+                });
                 
                 card.innerHTML = `
-                    <div style="font-weight:bold; color:#555; margin-bottom:5px;">Hojal N° ${index + 1}</div>
-                    <div class="crop-container" id="container-${hoja.id}">
-                        <img src="${hoja.src}" id="img-${hoja.id}" style="transform: rotate(${hoja.rotation}deg);">
-                        <div class="crop-box" id="box-${hoja.id}" style="left:${hoja.crop.x}%; top:${hoja.crop.y}%; width:${hoja.crop.w}%; height:${hoja.crop.h}%;">
-                            <div class="handle tl" data-handle="tl"></div>
-                            <div class="handle tr" data-handle="tr"></div>
-                            <div class="handle bl" data-handle="bl"></div>
-                            <div class="handle br" data-handle="br"></div>
-                        </div>
-                    </div>
-                    <div class="controls-card">
-                        <button class="btn-action" onclick="rotar(${hoja.id})">🔄 Rotar 90°</button>
-                        <button class="btn-action btn-danger" onclick="eliminarHoja(${hoja.id})">🗑️ Eliminar</button>
+                    <div style="font-size:10px; font-weight:bold; color:#475569;">Pág. ${index + 1}</div>
+                    <img src="${hoja.src}" style="transform: rotate(${hoja.rotation}deg);">
+                    <div class="card-actions">
+                        <button onclick="rotarHoja(${index})">🔄</button>
+                        <button style="background:#dc3545;" onclick="eliminarHoja(${index})">🗑️</button>
                     </div>
                 `;
                 workspace.appendChild(card);
-                hacerInteractivaZonadeRecorte(hoja);
             });
+            sincronizarSelectoresConHojaActiva();
+            actualizarPrevisualizadorGlobal();
         }
 
-        // Lógica interactiva nativa para arrastrar y ajustar los extremos en PC y móviles (Touch)
-        function hacerInteractivaZonadeRecorte(hoja) {
-            const box = document.getElementById(`box-${hoja.id}`);
-            const container = document.getElementById(`container-${hoja.id}`);
-            let modo = null;
-            let startX, startY, startLeft, startTop, startWidth, startHeight;
+        function cambiarVistaCola() {
+            const tipo = document.getElementById('vistaCola').value;
+            const workspace = document.getElementById('workspace');
+            if(tipo === 'vertical') workspace.classList.add('vertical');
+            else workspace.classList.remove('vertical');
+        }
 
-            container.addEventListener('mousedown', iniciarArrastre);
-            container.addEventListener('touchstart', iniciarArrastre, {passive: false});
+        function rotarHoja(index) {
+            documentoHojas[index].rotation = (documentoHojas[index].rotation + 90) % 360;
+            renderizarColaHojas();
+            cargarEditorImagenActiva();
+        }
 
-            function iniciarArrastre(e) {
+        function eliminarHoja(index) {
+            documentoHojas.splice(index, 1);
+            indiceActivo = documentoHojas.length - 1;
+            renderizarColaHojas();
+        }
+
+        function cargarEditorImagenActiva() {
+            if(indiceActivo === -1 || !documentoHojas[indiceActivo]) return;
+            const hoja = documentoHojas[indiceActivo];
+            
+            document.getElementById('editorLocalBox').style.display = "block";
+            document.getElementById('btnAutoBordes').style.display = "block";
+            const img = document.getElementById('editorImg');
+            img.src = hoja.src;
+            img.style.transform = `rotate(${hoja.rotation}deg)`;
+
+            const box = document.getElementById('interactBox');
+            box.style.left = hoja.crop.x + "%"; box.style.top = hoja.crop.y + "%";
+            box.style.width = hoja.crop.w + "%"; box.style.height = hoja.crop.h + "%";
+            
+            configurarManejadoresRecorte(hoja, box);
+            sincronizarSelectoresConHojaActiva();
+        }
+
+        function configurarManejadoresRecorte(hoja, box) {
+            const container = document.getElementById('editorLocalBox');
+            let modo = null; let startX, startY, startLeft, startTop, startWidth, startHeight;
+
+            container.onmousedown = iniciarPunto; container.ontouchstart = iniciarPunto;
+
+            function iniciarPunto(e) {
                 const clientX = e.touches ? e.touches[0].clientX : e.clientX;
                 const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-                
-                if (e.target.classList.contains('handle')) {
-                    e.preventDefault();
-                    modo = e.target.getAttribute('data-handle');
-                } else if (e.target === box) {
-                    e.preventDefault();
-                    modo = 'move';
-                } else {
-                    return;
-                }
-
-                startX = clientX;
-                startY = clientY;
-                startLeft = box.offsetLeft;
-                startTop = box.offsetTop;
-                startWidth = box.offsetWidth;
-                startHeight = box.offsetHeight;
-
-                document.addEventListener('mousemove', arrastrando);
-                document.addEventListener('touchmove', arrastrando, {passive: false});
-                document.addEventListener('mouseup', detenerArrastre);
-                document.addEventListener('touchend', detenerArrastre);
+                if(e.target.classList.contains('handle')) { modo = e.target.className.split(' ')[1]; }
+                else if(e.target === box) { modo = 'move'; } else { return; }
+                startX = clientX; startY = clientY;
+                startLeft = box.offsetLeft; startTop = box.offsetTop;
+                startWidth = box.offsetWidth; startHeight = box.offsetHeight;
+                document.onmousemove = moverPunto; document.ontouchmove = moverPunto;
+                document.onmouseup = finPunto; document.ontouchend = finPunto;
             }
 
-            function arrastrando(e) {
-                e.preventDefault();
+            function moverPunto(e) {
                 const clientX = e.touches ? e.touches[0].clientX : e.clientX;
                 const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-                
-                const dx = clientX - startX;
-                const dy = clientY - startY;
-                const cW = container.offsetWidth;
-                const cH = container.offsetHeight;
+                const dx = clientX - startX; const dy = clientY - startY;
+                const cW = container.offsetWidth; const cH = container.offsetHeight;
 
-                let newLeft = startLeft, newTop = startTop, newWidth = startWidth, newHeight = startHeight;
-
-                if (modo === 'move') {
-                    newLeft = Math.max(0, Math.min(startLeft + dx, cW - startWidth));
-                    newTop = Math.max(0, Math.min(startTop + dy, cH - startHeight));
+                if(modo === 'move') {
+                    let l = Math.max(0, Math.min(startLeft + dx, cW - startWidth));
+                    let t = Math.max(0, Math.min(startTop + dy, cH - startHeight));
+                    box.style.left = l + "px"; box.style.top = t + "px";
                 } else {
-                    if (modo.includes('r')) newWidth = Math.max(30, Math.min(startWidth + dx, cW - startLeft));
-                    if (modo.includes('b')) newHeight = Math.max(30, Math.min(startHeight + dy, cH - startTop));
+                    if (modo.includes('r')) box.style.width = Math.max(20, Math.min(startWidth + dx, cW - box.offsetLeft)) + "px";
+                    if (modo.includes('b')) box.style.height = Math.max(20, Math.min(startHeight + dy, cH - box.offsetTop)) + "px";
                     if (modo.includes('l')) {
-                        const possibleWidth = startWidth - dx;
-                        if (possibleWidth > 30 && startLeft + dx >= 0) {
-                            newLeft = startLeft + dx;
-                            newWidth = possibleWidth;
-                        }
+                        let targetL = startLeft + dx;
+                        if(targetL >= 0 && (startWidth - dx) > 20) { box.style.left = targetL + "px"; box.style.width = (startWidth - dx) + "px"; }
                     }
                     if (modo.includes('t')) {
-                        const possibleHeight = startHeight - dy;
-                        if (possibleHeight > 30 && startTop + dy >= 0) {
-                            newTop = startTop + dy;
-                            newHeight = possibleHeight;
-                        }
+                        let targetT = startTop + dy;
+                        if(targetT >= 0 && (startHeight - dy) > 20) { box.style.top = targetT + "px"; box.style.height = (startHeight - dy) + "px"; }
                     }
                 }
-
-                box.style.left = `${newLeft}px`;
-                box.style.top = `${newTop}px`;
-                box.style.width = `${newWidth}px`;
-                box.style.height = `${newHeight}px`;
-
-                // Guardar porcentajes relativos
-                hoja.crop.x = (newLeft / cW) * 100;
-                hoja.crop.y = (newTop / cH) * 100;
-                hoja.crop.w = (newWidth / cW) * 100;
-                hoja.crop.h = (newHeight / cH) * 100;
+                hoja.crop.x = (box.offsetLeft / cW) * 100; hoja.crop.y = (box.offsetTop / cH) * 100;
+                hoja.crop.w = (box.offsetWidth / cW) * 100; hoja.crop.h = (box.offsetHeight / cH) * 100;
+                actualizarPrevisualizadorGlobal();
             }
+            function finPunto() { document.onmousemove = null; document.ontouchmove = null; }
+        }
 
-            function detenerArrastre() {
-                document.removeEventListener('mousemove', arrastrando);
-                document.removeEventListener('touchmove', arrastrando);
+        document.getElementById('btnAutoBordes').addEventListener('click', () => {
+            if(indiceActivo === -1) return;
+            const hoja = documentoHojas[indiceActivo];
+            hoja.crop = { x: 8, y: 7, w: 84, h: 86 };
+            cargarEditorImagenActiva();
+            actualizarPrevisualizadorGlobal();
+        });
+
+        async function actualizarPrevisualizadorGlobal() {
+            const mock = document.getElementById('pdfMock');
+            const aviso = document.getElementById('mockAviso');
+            const mockImg = document.getElementById('mockImg');
+            
+            if(indiceActivo === -1 || documentoHojas.length === 0) {
+                aviso.style.display = "block"; mockImg.style.display = "none"; return;
+            }
+            aviso.style.display = "none";
+
+            const hoja = documentoHojas[indiceActivo];
+
+            let aspecto = (hoja.pdfTamaño === 'a3') ? (297/420) : (hoja.pdfTamaño === 'legal') ? (215.9/355.6) : (hoja.pdfTamaño === 'letter') ? (215.9/279.4) : (210/297);
+            if(hoja.pdfOrientacion === 'l') aspecto = 1 / aspecto;
+
+            const panelContainer = document.querySelector('.preview-panel');
+            const pHeight = panelContainer.offsetHeight - 60;
+            const pWidth = panelContainer.offsetWidth - 40;
+
+            let targetHeight = pHeight; let targetWidth = pHeight * aspecto;
+            if (targetWidth > pWidth) { targetWidth = pWidth; targetHeight = pWidth / aspecto; }
+
+            mock.style.height = targetHeight + "px"; mock.style.width = targetWidth + "px";
+
+            const finalSrc = await procesarMatrizImagen(hoja);
+            mockImg.src = finalSrc; mockImg.style.display = "block";
+
+            if(hoja.tipoContenido === 'extendido') {
+                mockImg.style.width = "100%"; mockImg.style.height = "100%";
+            } else if(hoja.tipoContenido === 'real') {
+                if(hoja.widthOriginal < 700) { mockImg.style.width = "55%"; mockImg.style.height = "auto"; } 
+                else { mockImg.style.width = "85%"; mockImg.style.height = "auto"; }
+            } else if(hoja.tipoContenido === 'ampliado') {
+                mockImg.style.width = hoja.zoomManual + "%"; mockImg.style.height = "auto";
             }
         }
 
-        window.rotar = function(id) {
-            const hoja = documentoHojas.find(h => h.id === id);
-            hoja.rotation = (hoja.rotation + 90) % 360;
-            renderizarDocumento();
-        };
-
-        window.eliminarHoja = function(id) {
-            documentoHojas = documentoHojas.filter(h => h.id !== id);
-            renderizarDocumento();
-        };
-
-        // EXPORTACIÓN CON CONFIGURACIÓN DE HOJA Y RECORTE DE EXTREMOS
-        document.getElementById('btnExportar').addEventListener('click', async () => {
-            const btn = document.getElementById('btnExportar');
-            btn.innerText = "Procesando...";
-            btn.disabled = true;
-
-            const tamano = document.getElementById('pdfTamaño').value;
-            const orientacion = document.getElementById('pdfOrientacion').value;
-
-            // Creamos el documento PDF con los ajustes elegidos por el usuario
-            const pdf = new jsPDF(orientacion, 'mm', tamano);
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-
-            for (let i = 0; i < documentoHojas.length; i++) {
-                if (i > 0) pdf.addPage();
-                const hoja = documentoHojas[i];
-                
-                // Recortamos y rotamos de forma limpia usando un canvas virtual antes de pasarlo al PDF
-                const finalImgData = await procesarExtremosImg(hoja);
-                pdf.addImage(finalImgData, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-            }
-
-            pdf.save('scanner_documento.pdf');
-            btn.innerText = "⚙️ Generar y Guardar PDF";
-            btn.disabled = false;
-        });
-
-        // Procesa la imagen original aplicando la rotación y extrayendo el recuadro ajustado por el usuario
-        function procesarExtremosImg(hoja) {
+        function procesarMatrizImagen(hoja) {
             return new Promise((resolve) => {
                 const img = new Image();
                 img.onload = function() {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-
-                    // 1. Manejo de la rotación en canvas virtual
-                    let w = img.width;
-                    let h = img.height;
-                    if (hoja.rotation === 90 || hoja.rotation === 270) {
-                        w = img.height;
-                        h = img.width;
-                    }
-                    canvas.width = w;
-                    canvas.height = h;
+                    const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+                    let w = img.width; let h = img.height;
+                    if (hoja.rotation === 90 || hoja.rotation === 270) { w = img.height; h = img.width; }
+                    canvas.width = w; canvas.height = h;
 
                     ctx.translate(canvas.width / 2, canvas.height / 2);
                     ctx.rotate((hoja.rotation * Math.PI) / 180);
                     ctx.drawImage(img, -img.width / 2, -img.height / 2);
 
-                    // 2. Aplicar el recorte de extremos seleccionado
-                    const cropX = (hoja.crop.x / 100) * canvas.width;
-                    const cropY = (hoja.crop.y / 100) * canvas.height;
-                    const cropW = (hoja.crop.w / 100) * canvas.width;
-                    const cropH = (hoja.crop.h / 100) * canvas.height;
+                    const cropX = (hoja.crop.x / 100) * canvas.width; const cropY = (hoja.crop.y / 100) * canvas.height;
+                    const cropW = (hoja.crop.w / 100) * canvas.width; const cropH = (hoja.crop.h / 100) * canvas.height;
 
-                    const cutCanvas = document.createElement('canvas');
-                    cutCanvas.width = cropW;
-                    cutCanvas.height = cropH;
-                    const cutCtx = cutCanvas.getContext('2d');
-                    
-                    cutCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+                    const cutCanvas = document.createElement('canvas'); cutCanvas.width = cropW; cutCanvas.height = cropH;
+                    cutCanvas.getContext('2d').drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
                     resolve(cutCanvas.toDataURL('image/jpeg', 0.85));
                 };
                 img.src = hoja.src;
             });
         }
+
+        document.getElementById('btnExportar').addEventListener('click', async () => {
+            const btn = document.getElementById('btnExportar');
+            btn.innerText = "Compilando PDF..."; btn.disabled = true;
+            let pdf = null;
+
+            for (let i = 0; i < documentoHojas.length; i++) {
+                const hoja = documentoHojas[i];
+                if (i === 0) { pdf = new jsPDF(hoja.pdfOrientacion, 'mm', hoja.pdfTamaño); } 
+                else { pdf.addPage(hoja.pdfTamaño, hoja.pdfOrientacion); }
+
+                const pdfW = pdf.internal.pageSize.getWidth(); const pdfH = pdf.internal.pageSize.getHeight();
+                const imgData = await procesarMatrizImagen(hoja);
+                let targetW = pdfW; let targetH = pdfH; let posX = 0; let posY = 0;
+
+                if(hoja.tipoContenido === 'real') {
+                    if(hoja.widthOriginal < 700) {
+                        targetW = pdfW * 0.55; targetH = pdfH * 0.40; posX = (pdfW - targetW) / 2; posY = (pdfH - targetH) / 2;
+                    }
+                } else if(hoja.tipoContenido === 'ampliado') {
+                    const factor = hoja.zoomManual / 100;
+                    targetW = pdfW * factor; targetH = pdfH * factor; posX = (pdfW - targetW) / 2; posY = (pdfH - targetH) / 2;
+                }
+                pdf.addImage(imgData, 'JPEG', posX, posY, targetW, targetH);
+            }
+            pdf.save('DS_Scanner_Pro.pdf');
+            btn.innerText = "⚙️ Generar y Guardar PDF Final"; btn.disabled = false;
+        });
+
+        window.addEventListener('resize', actualizarPrevisualizadorGlobal);
     </script>
 </body>
 </html>
