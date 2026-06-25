@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DS Scanner PDF Pro 100% local</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script async src="https://docs.opencv.org/4.5.4/opencv.js" id="opencv-src"></script>
     <style>
         :root {
             --primary: #25D366;
@@ -31,14 +32,19 @@
 
         .preview-panel {
             width: 60%; flex-grow: 1; background: #525659; display: flex; flex-direction: column;
-            align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; position: relative;
+            align-items: center; justify-content: center; padding: 35px; box-sizing: border-box; position: relative;
+            touch-action: none; user-select: none;
         }
         .pdf-canvas-mock {
             background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.4); display: flex; align-items: center;
             justify-content: center; overflow: hidden; position: relative; max-width: 100%; max-height: 100%;
         }
-        .pdf-canvas-mock img { position: absolute; object-fit: contain; }
+        .pdf-canvas-mock img { position: absolute; pointer-events: none; }
         
+        .ruler-svg-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1100;
+        }
+
         .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
         .btn-group .btn-label, .btn-group button { flex: 1 1 140px; min-height: 42px; }
         button, label.btn-label {
@@ -47,7 +53,7 @@
             text-align: center; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
         }
         .btn-label input[type="file"] { display: none !important; }
-        .btn-block { width: 100%; background-color: var(--accent); }
+        .btn-block { width: 100%; background-color: var(--accent); margin-top: 5px; }
         
         .config-section { background: #f8f9fa; padding: 10px; border-radius: 6px; margin-bottom: 12px; border: 1px solid #e2e8f0; }
         .config-section label { font-size: 11px; color: #4a5568; font-weight: bold; }
@@ -55,37 +61,54 @@
         
         .editor-local-box { position: relative; width: 100%; background: #000; overflow: hidden; margin-bottom: 10px; display: none; }
         .editor-local-box img { width: 100%; display: block; user-select: none; }
-        .crop-box { position: absolute; border: 2px dashed #25D366; background: rgba(37, 211, 102, 0.2); box-sizing: border-box; }
-        .handle { position: absolute; width: 14px; height: 14px; background: #25D366; border: 2px solid white; border-radius: 50%; }
-        .tl { top: -7px; left: -7px; } .tr { top: -7px; right: -7px; } .bl { bottom: -7px; left: -7px; } .br { bottom: -7px; right: -7px; }
+        
+        .corner-handle {
+            position: absolute; width: 24px; height: 24px; background: var(--primary);
+            border: 3px solid white; border-radius: 50%; cursor: move; z-index: 100;
+            transform: translate(-12px, -12px); box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        .svg-overlay { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none; z-index: 50; }
 
-        .workspace-title { font-size: 13px; font-weight: bold; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px; }
+        .workspace-title { font-size: 13px; font-weight: bold; margin-top: 10px; border-top: 1px solid #eee; padding-top: 10px; display: flex; justify-content: space-between; align-items: center; }
         .workspace { display: flex; gap: 10px; padding: 10px 0; overflow-x: auto; min-height: 125px; }
         .workspace.vertical { flex-direction: column; overflow-x: hidden; overflow-y: auto; max-height: 300px; }
         
+        .slot-container { display: flex; gap: 8px; width: 100%; margin: 8px 0; }
+        .slot-box {
+            flex: 1; background: #f1f5f9; border: 2px dashed #cbd5e1; border-radius: 6px; padding: 8px;
+            text-align: center; font-size: 11px; font-weight: bold; color: #64748b; cursor: pointer;
+        }
+        .slot-box.active { border-color: var(--accent); background: #e0f2fe; color: var(--accent); }
+        .slot-box img { max-width: 100%; max-height: 50px; display: block; margin: 4px auto 0; object-fit: contain; }
+
         .page-card {
             background: #f1f5f9; border: 2px solid #cbd5e1; border-radius: 6px; padding: 6px;
             display: flex; flex-direction: column; align-items: center; min-width: 110px; max-width: 110px; position: relative; cursor: grab; box-sizing: border-box;
         }
+        .page-card:active { cursor: grabbing; }
         .page-card.active { border-color: var(--accent); background: #e0f2fe; }
-        .page-card img { max-width: 80px; max-height: 65px; object-fit: contain; pointer-events: none; }
+        .page-card img { max-width: 80px; max-height: 50px; object-fit: contain; pointer-events: none; margin-top: 4px; }
         .card-actions { display: flex; gap: 4px; margin-top: 5px; width: 100%; }
-        .card-actions button { padding: 4px; font-size: 9px; flex-grow: 1; background: #64748b; }
+        .card-actions button { padding: 4px; font-size: 9px; flex-grow: 1; background: #64748b; color: white; border: none; border-radius: 4px; cursor: pointer; }
         
         .about-box { font-size: 10px; color: #64748b; padding: 10px 15px; border-top: 1px solid #e2e8f0; background: #f8f9fa; flex-shrink: 0; }
-
+        
         .camera-modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85); z-index: 2000; align-items: center; justify-content: center; flex-direction: column;
+            background: rgba(0,0,0,0.9); z-index: 2500; align-items: center; justify-content: center; flex-direction: column;
         }
-        .camera-modal video { width: 90%; max-width: 500px; border-radius: 8px; background: black; }
+        .camera-modal video { width: 85%; max-width: 640px; border: 3px solid var(--primary); border-radius: 12px; background: black; }
+        .camera-controls { margin-top: 15px; display: flex; gap: 10px; }
+        .camera-controls button { min-width: 120px; }
 
-        @media (max-width: 768px) {
-            body { overflow: auto; height: auto; } .main-layout { flex-direction: column; height: auto; }
-            .sidebar { width: 100%; max-width: 100%; height: auto; border-right: none; }
-            .sidebar-scroll-content { overflow-y: visible; } .preview-panel { width: 100%; height: 380px; }
-            .pdf-canvas-mock { width: 240px !important; height: 340px !important; }
+        #cvLoading { display: none; background: #eab308; color: black; font-size: 11px; padding: 6px; text-align: center; font-weight: bold; margin-bottom: 8px; border-radius: 4px; }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); background-color: #128c7e; }
+            100% { transform: scale(1); }
         }
+        .pulse-btn { animation: pulse 2s infinite; background-color: #075e54; }
     </style>
 </head>
 <body>
@@ -96,23 +119,32 @@
         <div class="sidebar">
             <div class="sidebar-scroll-content">
                 <div class="btn-group">
-                    <button type="button" id="btnCapturaDirecta" onclick="dispararCamaraDispositivo()">📷 Capturar Foto</button>
+                    <button type="button" id="btnCapturarGatillo" onclick="dispararCamaraDispositivo()">📷 Capturar Foto</button>
                     <input type="file" accept="image/*" capture="environment" id="cameraInput" style="display:none !important;">
-                    
-                    <label class="btn-label" style="background-color: #2b7a78; font-size:13px;">
-                        🖼️ Galería / Archivos 
-                        <input type="file" accept="image/*" multiple id="galleryInput">
-                    </label>
+                    <label class="btn-label" style="background-color: #2b7a78; font-size:13px;">🖼️ Galería / Archivos <input type="file" accept="image/*" id="galleryInput"></label>
                 </div>
 
+                <div id="cvLoading">⏳ Cargando Motores de Visión Artificial...</div>
+
                 <div class="editor-local-box" id="editorLocalBox">
+                    <svg class="svg-overlay" id="svgLines"><polygon id="svgPoly" points="" style="fill:rgba(37,211,102,0.15); stroke:#25D366; stroke-width:2; stroke-dasharray:4;" /></svg>
                     <img id="editorImg" src="">
-                    <div class="crop-box" id="interactBox">
-                        <div class="handle tl"></div><div class="handle tr"></div>
-                        <div class="handle bl"></div><div class="handle br"></div>
-                    </div>
+                    <canvas id="canvasAux" style="display:none;"></canvas>
+                    
+                    <div class="corner-handle" id="pt_tl"></div>
+                    <div class="corner-handle" id="pt_tr"></div>
+                    <div class="corner-handle" id="pt_br"></div>
+                    <div class="corner-handle" id="pt_bl"></div>
                 </div>
-                <button id="btnAutoBordes" style="display:none; background:#0f172a; margin-bottom:12px; font-size:11px; padding:10px; width:100%; font-weight:bold; color:#25D366; border:1px solid #25D366; border-radius:6px;">✨ Auto-detectar Contornos (IA Local)</button>
+
+                <div class="config-section" id="wrapperGiroManual" style="display:none;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <label>🔄 AJUSTE DE ORIENTACIÓN Y PERSPECTIVA:</label>
+                        <button onclick="rotar90Rapido()" style="padding:4px 8px; font-size:10px; background:#475569; border:none; color:white; border-radius:4px;">+90°</button>
+                    </div>
+                    <input type="range" id="giroRuedita" min="-45" max="45" value="0" oninput="ajustarGiroFinoRuedita()">
+                    <button onclick="procesarPerspectivaHomograficaManual()" class="btn-block" style="background:#0f172a; font-size:11px; min-height:32px; margin-top:5px;">📐 Aplicar Recorte y Alinear Perspectiva</button>
+                </div>
 
                 <div class="config-section">
                     <label>📐 FORMATO HOJA PDF (PARA HOJA ACTIVA):</label>
@@ -131,25 +163,42 @@
                 </div>
 
                 <div class="config-section">
-                    <label>🖼️ FORMATO DE CONTENIDO (PARA HOJA ACTIVA):</label>
+                    <label>🖼️ FORMATO DE CONTENIDO:</label>
                     <select id="tipoContenido" onchange="guardarCambiosHojaActiva()">
-                        <option value="extendido">Tamaño Extendido (Ajustar a la hoja)</option>
+                        <option value="extendido">Tamaño Extendido (Máximo / Ajustar a la hoja)</option>
                         <option value="real">Tamaño Real (Aprox. Credencial / DNI)</option>
+                        <option value="frente_dorso">Frente y Reverso en la misma Hoja (Alineados)</option>
                         <option value="ampliado">Tamaño Ampliado (Zoom Manual)</option>
                     </select>
-                    <div id="wrapperZoomManual" style="display:none; margin-top: 8px;">
-                        <label>🔍 Zoom Manual del Contenido:</label>
-                        <input type="range" id="zoomManual" min="50" max="200" value="100" oninput="guardarCambiosHojaActiva()">
+                    
+                    <div id="wrapperSlotsCredencial" style="display:none;">
+                        <label>🪪 PASO EN CURSO (CREDENCIAL):</label>
+                        <div class="slot-container">
+                            <div class="slot-box active" id="slot_frente" onclick="cambiarRanuraEdicion('frente')">
+                                🟩 Frente (Cara A)
+                                <div id="preview_slot_frente">- Vacío -</div>
+                            </div>
+                            <div class="slot-box" id="slot_dorso" onclick="cambiarRanuraEdicion('dorso')">
+                                🟨 Reverso (Cara B)
+                                <div id="preview_slot_dorso">- Vacío -</div>
+                            </div>
+                        </div>
+                        <button type="button" id="btnLimpiarDorso" onclick="cancelarReversoDorso()" style="width:100%; background:#6c757d; font-size:10px; padding:4px; margin-top:4px; min-height:20px; display:none;">❌ Cancelar / Limpiar Reverso</button>
+                    </div>
+
+                    <div id="wrapperZoomManual" style="display:none;">
+                        <label id="lblZoomManual">🔍 Zoom Manual del Contenido:</label>
+                        <input type="range" id="zoomManual" min="30" max="180" value="100" oninput="guardarCambiosHojaActiva()">
                     </div>
                 </div>
 
                 <button class="btn-block" id="btnExportar" style="margin-bottom:15px;" disabled>⚙️ Generar y Guardar PDF Final</button>
-
+                
                 <div class="workspace-title">
-                    🗂️ Ordenar Hojas del Proyecto:
-                    <select id="vistaCola" style="width:auto; display:inline; margin-left:10px; padding:2px;" onchange="cambiarVistaCola()">
-                        <option value="horizontal">Vista Horizontal</option>
-                        <option value="vertical">Vista Vertical</option>
+                    <span>🗂️ Hojas del Proyecto:</span>
+                    <select id="vistaCola" style="width:auto; padding:2px; font-size:11px;" onchange="cambiarVistaCola()">
+                        <option value="horizontal">Horizontal</option>
+                        <option value="vertical">Vertical</option>
                     </select>
                 </div>
                 <div class="workspace" id="workspace"></div>
@@ -157,24 +206,27 @@
 
             <div class="about-box">
                 <strong>Producido por Dani Soft</strong> | Ind. Argentina | Versión 1.0<br>
-                <span style="color:#ef4444; font-weight:bold;">Términos legales:</span> Propiedad Intelectual Protegida. Este software opera de manera local. Queda prohibida la copia, reproducción o ingeniería inversa de este código. Todo uso indebido será sancionado penalmente.
+                <span style="color:#ef4444; font-weight:bold;">Términos legales:</span> Queda prohibida la copia o ingeniería inversa de este código.
             </div>
         </div>
 
-        <div class="preview-panel">
-            <div style="color:white; font-size:11px; position:absolute; top:10px; left:15px; font-weight:bold; background:rgba(0,0,0,0.5); padding:4px 8px; border-radius:4px; z-index:10;">👁️ VISTA PREVIA REAL DEL PDF</div>
+        <div class="preview-panel" id="previewPanel">
             <div class="pdf-canvas-mock" id="pdfMock">
                 <div id="mockAviso" style="color:#94a3b8; font-size:12px; text-align:center; padding:20px;">No hay contenido para previsualizar.</div>
-                <img id="mockImg" src="" style="display:none;">
+                <div id="containerMockImagenes" style="width:100%; height:100%; position:relative; display:none;">
+                    <img id="mockImg" src="" style="position:absolute;">
+                    <img id="mockImgDorso" src="" style="position:absolute; display:none;">
+                </div>
+                <svg class="ruler-svg-overlay" id="rulerOverlay"></svg>
             </div>
         </div>
     </div>
 
-    <div class="camera-modal" id="cameraModal">
+    <div id="cameraModal" class="camera-modal">
         <video id="videoStream" autoplay playsinline></video>
-        <div style="margin-top:15px; display:flex; gap:10px;">
-            <button onclick="tomarFotoWebcam()" style="background:#007bff; padding:12px 24px;">📸 Capturar Hoja</button>
-            <button onclick="cerrarModalCamara()" style="background:#dc3545;">❌ Cancelar</button>
+        <div class="camera-controls">
+            <button onclick="tomarFotoWebcam()" style="background-color: var(--primary);">📸 Capturar</button>
+            <button onclick="cerrarModalCamara()" style="background-color: #ef4444;">❌ Cancelar</button>
         </div>
     </div>
 
@@ -182,104 +234,107 @@
         const { jsPDF } = window.jspdf;
         let documentoHojas = [];
         let indiceActivo = -1;
+        let ranuraActiva = 'frente'; 
+        let openCvListo = false;
         let localStream = null;
+        let puntoCeroFijo = null; // Guardará el anclaje del clic (0,0 fijo)
+
+        document.getElementById('opencv-src').addEventListener('load', () => { openCvListo = true; document.getElementById('cvLoading').style.display = "none"; });
 
         const cameraInput = document.getElementById('cameraInput');
         const galleryInput = document.getElementById('galleryInput');
-        cameraInput.addEventListener('change', (e) => procesarArchivos(e.target.files));
-        galleryInput.addEventListener('change', (e) => procesarArchivos(e.target.files));
+        cameraInput.addEventListener('change', (e) => registrarArchivosMesa(e.target.files));
+        galleryInput.addEventListener('change', (e) => registrarArchivosMesa(e.target.files));
 
-        function dispararCamaraDispositivo() {
-            if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-                cameraInput.click();
-            } else {
-                abrirWebcamPC();
-            }
-        }
-
-        async function abrirWebcamPC() {
-            const modal = document.getElementById('cameraModal');
-            const video = document.getElementById('videoStream');
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
-                });
-                video.srcObject = localStream; modal.style.display = "flex";
-            } catch (err) {
-                alert("No se pudo acceder a la cámara.");
-            }
-        }
-
-        function tomarFotoWebcam() {
-            const video = document.getElementById('videoStream');
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-            inyectarImagenEstructura(canvas.toDataURL('image/jpeg', 0.9), canvas.width, canvas.height);
+        function dispararCamaraDispositivo() { if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) { cameraInput.click(); } else { abrirWebcamPC(); } }
+        async function abrirWebcamPC() { const modal = document.getElementById('cameraModal'); const video = document.getElementById('videoStream'); try { localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } }); video.srcObject = localStream; modal.style.display = "flex"; } catch (err) { alert("Sin acceso a la cámara de la PC."); } }
+        
+        function tomarFotoWebcam() { 
+            const video = document.getElementById('videoStream'); 
+            const canvas = document.createElement('canvas'); 
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight; 
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height); 
+            const fotoCapturada = canvas.toDataURL('image/jpeg', 0.9);
             cerrarModalCamara();
+            procesarEntradaImagenCruda(fotoCapturada, canvas.width, canvas.height); 
         }
 
-        function cerrarModalCamara() {
-            document.getElementById('cameraModal').style.display = "none";
-            if(localStream) localStream.getTracks().forEach(track => track.stop());
-        }
+        function cerrarModalCamara() { document.getElementById('cameraModal').style.display = "none"; if(localStream) { localStream.getTracks().forEach(track => track.stop()); localStream = null; } }
 
-        function procesarArchivos(files) {
-            Array.from(files).forEach(file => {
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    const img = new Image();
-                    img.onload = function() {
-                        inyectarImagenEstructura(event.target.result, img.width, img.height);
-                    };
-                    img.src = event.target.result;
-                };
-                reader.readAsDataURL(file);
-            });
-        }
-
-        function inyectarImagenEstructura(srcBase64, width, height) {
-            const hoja = {
-                id: Date.now() + Math.random(),
-                src: srcBase64,
-                rotation: 0,
-                crop: { x: 0, y: 0, w: 100, h: 100 },
-                widthOriginal: width,
-                heightOriginal: height,
-                pdfTamaño: "a4",
-                pdfOrientacion: "p",
-                tipoContenido: "extendido",
-                zoomManual: 100
+        function registrarArchivosMesa(files) {
+            if(files.length === 0) return;
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() { procesarEntradaImagenCruda(event.target.result, img.width, img.height); };
+                img.src = event.target.result;
             };
-            documentoHojas.push(hoja);
-            indiceActivo = documentoHojas.length - 1;
-            renderizarColaHojas();
-            cargarEditorImagenActiva();
+            reader.readAsDataURL(files[0]);
+        }
+
+        function procesarEntradaImagenCruda(srcBase64, width, height) {
+            if (indiceActivo !== -1 && documentoHojas[indiceActivo] && documentoHojas[indiceActivo].tipoContenido === 'frente_dorso' && ranuraActiva === 'dorso') {
+                const hoja = documentoHojas[indiceActivo];
+                hoja.srcDorsoRaw = srcBase64; hoja.srcDorso = srcBase64;
+                hoja.widthDorso = width; hoja.heightDorso = height;
+                hoja.cornersDorso = { tl: {x: 0, y: 0}, tr: {x: 100, y: 0}, br: {x: 100, y: 100}, bl: {x: 0, y: 100} };
+                hoja.rotationDorso = 0; hoja.rueditaGiroFinoDorso = 0;
+            } else {
+                let orientacionDeteccion = "p";
+                if (width > height) { orientacionDeteccion = "l"; }
+                const hoja = {
+                    id: Date.now() + Math.random(),
+                    srcRaw: srcBase64, src: srcBase64, srcDorsoRaw: null, srcDorso: null,
+                    rotation: 0, rueditaGiroFino: 0, rotationDorso: 0, rueditaGiroFinoDorso: 0,
+                    corners: { tl: {x: 0, y: 0}, tr: {x: 100, y: 0}, br: {x: 100, y: 100}, bl: {x: 0, y: 100} },
+                    cornersDorso: { tl: {x: 0, y: 0}, tr: {x: 100, y: 0}, br: {x: 100, y: 100}, bl: {x: 0, y: 100} },
+                    widthOriginal: width, heightOriginal: height, widthDorso: 0, heightDorso: 0,
+                    pdfTamaño: "a4", pdfOrientacion: orientacionDeteccion, tipoContenido: "extendido", zoomManual: 100
+                };
+                documentoHojas.push(hoja); indiceActivo = documentoHojas.length - 1; ranuraActiva = 'frente';
+            }
+            renderizarColaHojas(); cargarEditorImagenActiva();
+        }
+
+        function cambiarRanuraEdicion(ranura) { ranuraActiva = ranura; cargarEditorImagenActiva(); }
+        function cancelarReversoDorso() {
+            if(indiceActivo === -1 || !documentoHojas[indiceActivo]) return;
+            const hoja = documentoHojas[indiceActivo];
+            hoja.srcDorsoRaw = null; hoja.srcDorso = null; ranuraActiva = 'frente';
+            renderizarColaHojas(); cargarEditorImagenActiva();
         }
 
         function guardarCambiosHojaActiva() {
             if (indiceActivo === -1 || !documentoHojas[indiceActivo]) return;
             const hoja = documentoHojas[indiceActivo];
-            
             hoja.pdfTamaño = document.getElementById('pdfTamaño').value;
             hoja.pdfOrientacion = document.getElementById('pdfOrientacion').value;
             hoja.tipoContenido = document.getElementById('tipoContenido').value;
             hoja.zoomManual = parseInt(document.getElementById('zoomManual').value);
-
-            document.getElementById('wrapperZoomManual').style.display = (hoja.tipoContenido === 'ampliado') ? "block" : "none";
-            actualizarPrevisualizadorGlobal();
+            renderizarColaHojas();
         }
 
         function sincronizarSelectoresConHojaActiva() {
             if (indiceActivo === -1 || !documentoHojas[indiceActivo]) return;
             const hoja = documentoHojas[indiceActivo];
-
             document.getElementById('pdfTamaño').value = hoja.pdfTamaño;
             document.getElementById('pdfOrientacion').value = hoja.pdfOrientacion;
             document.getElementById('tipoContenido').value = hoja.tipoContenido;
             document.getElementById('zoomManual').value = hoja.zoomManual;
+            
+            const mostrarZoom = (hoja.tipoContenido === 'ampliado' || hoja.tipoContenido === 'frente_dorso' || hoja.tipoContenido === 'real');
+            document.getElementById('wrapperZoomManual').style.display = mostrarZoom ? "block" : "none";
+            document.getElementById('wrapperSlotsCredencial').style.display = (hoja.tipoContenido === 'frente_dorso') ? "block" : "none";
+            document.getElementById('lblZoomManual').innerText = (hoja.tipoContenido === 'frente_dorso' || hoja.tipoContenido === 'real') ? "🔍 Ajustar Zoom de Impresión (Hoja PDF):" : "🔍 Zoom Manual del Contenido:";
 
-            document.getElementById('wrapperZoomManual').style.display = (hoja.tipoContenido === 'ampliado') ? "block" : "none";
+            document.getElementById('preview_slot_frente').innerHTML = `<img src="${hoja.src}">`;
+            document.getElementById('preview_slot_dorso').innerHTML = hoja.srcDorso ? `<img src="${hoja.srcDorso}">` : '- Vacío -';
+            document.getElementById('btnLimpiarDorso').style.display = hoja.srcDorso ? "block" : "none";
+            document.getElementById('giroRuedita').value = (ranuraActiva === 'frente') ? hoja.rueditaGiroFino : hoja.rueditaGiroFinoDorso;
+
+            const btnGatillo = document.getElementById('btnCapturarGatillo');
+            if (hoja.tipoContenido === 'frente_dorso' && !hoja.srcDorso) { btnGatillo.innerText = "📸 Capturar Reverso ahora"; } 
+            else { btnGatillo.innerText = "📷 Capturar Foto"; }
         }
 
         function renderizarColaHojas() {
@@ -289,11 +344,10 @@
             
             if(documentoHojas.length === 0) {
                 workspace.innerHTML = '<p style="font-size:11px; color:#888;">Cola vacía.</p>';
-                btnExportar.disabled = true;
-                document.getElementById('mockAviso').style.display = "block";
-                document.getElementById('mockImg').style.display = "none";
+                btnExportar.disabled = true; document.getElementById('mockAviso').style.display = "block";
+                document.getElementById('containerMockImagenes').style.display = "none";
                 document.getElementById('editorLocalBox').style.display = "none";
-                document.getElementById('btnAutoBordes').style.display = "none";
+                document.getElementById('wrapperGiroManual').style.display = "none";
                 return;
             }
             btnExportar.disabled = false;
@@ -302,7 +356,6 @@
                 const card = document.createElement('div');
                 card.className = `page-card ${index === indiceActivo ? 'active' : ''}`;
                 card.setAttribute('draggable', true);
-                
                 card.addEventListener('dragstart', (e) => e.dataTransfer.setData('text/plain', index));
                 card.addEventListener('dragover', (e) => e.preventDefault());
                 card.addEventListener('drop', (e) => {
@@ -310,31 +363,25 @@
                     const deIndex = parseInt(e.dataTransfer.getData('text/plain'));
                     const elemento = documentoHojas.splice(deIndex, 1)[0];
                     documentoHojas.splice(index, 0, elemento);
-                    indiceActivo = index;
-                    renderizarColaHojas();
-                    cargarEditorImagenActiva();
+                    indiceActivo = index; renderizarColaHojas(); cargarEditorImagenActiva();
                 });
-
                 card.addEventListener('click', (e) => {
-                    if(e.target.tagName !== 'BUTTON') {
-                        indiceActivo = index;
-                        renderizarColaHojas();
-                        cargarEditorImagenActiva();
-                    }
+                    if(e.target.tagName !== 'BUTTON') { indiceActivo = index; ranuraActiva = 'frente'; renderizarColaHojas(); cargarEditorImagenActiva(); }
                 });
-                
-                card.innerHTML = `
-                    <div style="font-size:10px; font-weight:bold; color:#475569;">Pág. ${index + 1}</div>
-                    <img src="${hoja.src}" style="transform: rotate(${hoja.rotation}deg);">
-                    <div class="card-actions">
-                        <button onclick="rotarHoja(${index})">🔄</button>
-                        <button style="background:#dc3545;" onclick="eliminarHoja(${index})">🗑️</button>
-                    </div>
-                `;
+                let renderImg = `<img src="${hoja.src}">`;
+                if(hoja.tipoContenido === 'frente_dorso') {
+                    renderImg = `<div style="display:flex; gap:2px;"><img src="${hoja.src}" style="max-width:35px;"><img src="${hoja.srcDorso ? hoja.srcDorso : ''}" style="max-width:35px; background:#ddd;"></div>`;
+                }
+                card.innerHTML = `<div style="font-size:10px; font-weight:bold; color:#475569;">Pág. ${index + 1}</div>${renderImg}<div class="card-actions"><button onclick="eliminarHoja(${index}); event.stopPropagation();">🗑️</button></div>`;
                 workspace.appendChild(card);
             });
-            sincronizarSelectoresConHojaActiva();
-            actualizarPrevisualizadorGlobal();
+            sincronizarSelectoresConHojaActiva(); actualizarPrevisualizadorGlobal();
+        }
+
+        function eliminarHoja(index) {
+            documentoHojas.splice(index, 1);
+            if(indiceActivo >= documentoHojas.length) indiceActivo = documentoHojas.length - 1;
+            renderizarColaHojas();
         }
 
         function cambiarVistaCola() {
@@ -344,225 +391,326 @@
             else workspace.classList.remove('vertical');
         }
 
-        function rotarHoja(index) {
-            documentoHojas[index].rotation = (documentoHojas[index].rotation + 90) % 360;
-            renderizarColaHojas();
-            cargarEditorImagenActiva();
-        }
-
-        function eliminarHoja(index) {
-            documentoHojas.splice(index, 1);
-            indiceActivo = documentoHojas.length - 1;
-            renderizarColaHojas();
-        }
-
         function cargarEditorImagenActiva() {
             if(indiceActivo === -1 || !documentoHojas[indiceActivo]) return;
             const hoja = documentoHojas[indiceActivo];
-            
             document.getElementById('editorLocalBox').style.display = "block";
-            document.getElementById('btnAutoBordes').style.display = "block";
+            document.getElementById('wrapperGiroManual').style.display = "block";
             const img = document.getElementById('editorImg');
-            img.src = hoja.src;
-            img.style.transform = `rotate(${hoja.rotation}deg)`;
-
-            const box = document.getElementById('interactBox');
-            box.style.left = hoja.crop.x + "%"; box.style.top = hoja.crop.y + "%";
-            box.style.width = hoja.crop.w + "%"; box.style.height = hoja.crop.h + "%";
-            
-            configurarManejadoresRecorte(hoja, box);
-            sincronizarSelectoresConHojaActiva();
+            if (ranuraActiva === 'dorso') {
+                img.src = hoja.srcDorsoRaw ? hoja.srcDorsoRaw : hoja.srcRaw;
+                img.style.transform = `rotate(${hoja.rotationDorso + hoja.rueditaGiroFinoDorso}deg)`;
+            } else {
+                img.src = hoja.srcRaw; img.style.transform = `rotate(${hoja.rotation + hoja.rueditaGiroFino}deg)`;
+            }
+            armarEsquinasYLineasGraficas(hoja); sincronizarSelectoresConHojaActiva();
         }
 
-        function configurarManejadoresRecorte(hoja, box) {
+        function armarEsquinasYLineasGraficas(hoja) {
             const container = document.getElementById('editorLocalBox');
-            let modo = null; let startX, startY, startLeft, startTop, startWidth, startHeight;
-
-            container.onmousedown = iniciarPunto; container.ontouchstart = iniciarPunto;
-
-            function iniciarPunto(e) {
-                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-                if(e.target.classList.contains('handle')) { modo = e.target.className.split(' ')[1]; }
-                else if(e.target === box) { modo = 'move'; } else { return; }
-                startX = clientX; startY = clientY;
-                startLeft = box.offsetLeft; startTop = box.offsetTop;
-                startWidth = box.offsetWidth; startHeight = box.offsetHeight;
-                document.onmousemove = moverPunto; document.ontouchmove = moverPunto;
-                document.onmouseup = finPunto; document.ontouchend = finPunto;
-            }
-
-            function moverPunto(e) {
-                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-                const dx = clientX - startX; const dy = clientY - startY;
-                const cW = container.offsetWidth; const cH = container.offsetHeight;
-
-                if(modo === 'move') {
-                    let l = Math.max(0, Math.min(startLeft + dx, cW - startWidth));
-                    let t = Math.max(0, Math.min(startTop + dy, cH - startHeight));
-                    box.style.left = l + "px"; box.style.top = t + "px";
-                } else {
-                    if (modo.includes('r')) box.style.width = Math.max(20, Math.min(startWidth + dx, cW - box.offsetLeft)) + "px";
-                    if (modo.includes('b')) box.style.height = Math.max(20, Math.min(startHeight + dy, cH - box.offsetTop)) + "px";
-                    if (modo.includes('l')) {
-                        let targetL = startLeft + dx;
-                        if(targetL >= 0 && (startWidth - dx) > 20) { box.style.left = targetL + "px"; box.style.width = (startWidth - dx) + "px"; }
-                    }
-                    if (modo.includes('t')) {
-                        let targetT = startTop + dy;
-                        if(targetT >= 0 && (startHeight - dy) > 20) { box.style.top = targetT + "px"; box.style.height = (startHeight - dy) + "px"; }
-                    }
-                }
-                hoja.crop.x = (box.offsetLeft / cW) * 100; hoja.crop.y = (box.offsetTop / cH) * 100;
-                hoja.crop.w = (box.offsetWidth / cW) * 100; hoja.crop.h = (box.offsetHeight / cH) * 100;
-                actualizarPrevisualizadorGlobal();
-            }
-            function finPunto() { document.onmousemove = null; document.ontouchmove = null; }
+            const esquinas = ['tl', 'tr', 'br', 'bl'];
+            const cMap = (ranuraActiva === 'frente') ? hoja.corners : hoja.cornersDorso;
+            esquinas.forEach(pos => {
+                const handle = document.getElementById(`pt_${pos}`);
+                handle.style.left = cMap[pos].x + "%"; handle.style.top = cMap[pos].y + "%";
+                handle.onmousedown = (e) => iniciarMovimientoEsquina(e, pos, cMap, handle, container);
+                handle.ontouchstart = (e) => iniciarMovimientoEsquina(e, pos, cMap, handle, container);
+            });
+            dibujarPoligonoSVG(cMap);
         }
 
-        // =========================================================================
-        // ALGORITMO REAL 100% OFFLINE DE DETECCIÓN MATRICIAL DE CONTORNOS POR CONTRASTE
-        // =========================================================================
-        document.getElementById('btnAutoBordes').addEventListener('click', () => {
-            if(indiceActivo === -1 || !documentoHojas[indiceActivo]) return;
-            const hoja = documentoHojas[indiceActivo];
-            const btn = document.getElementById('btnAutoBordes');
-            
-            btn.innerText = "Escaneando matriz...";
+        function iniciarMovimientoEsquina(e, pos, cMap, handle, container) {
+            e.preventDefault();
+            const startX = e.touches ? e.touches[0].clientX : e.clientX;
+            const startY = e.touches ? e.touches[0].clientY : e.clientY;
+            const startLeft = handle.offsetLeft; const startTop = handle.offsetTop;
+            document.onmousemove = (ev) => moverEsquina(ev); document.ontouchmove = (ev) => moverEsquina(ev);
+            document.onmouseup = () => document.onmousemove = document.ontouchmove = null;
+            document.ontouchend = () => document.onmousemove = document.ontouchmove = null;
+            function moverEsquina(ev) {
+                const cX = ev.touches ? ev.touches[0].clientX : ev.clientX; const cY = ev.touches ? ev.touches[0].clientY : ev.clientY;
+                let l = startLeft + (cX - startX); let t = startTop + (cY - startY);
+                l = Math.max(0, Math.min(l, container.offsetWidth)); t = Math.max(0, Math.min(t, container.offsetHeight));
+                handle.style.left = l + "px"; handle.style.top = t + "px";
+                cMap[pos].x = (l / container.offsetWidth) * 100; cMap[pos].y = (t / container.offsetHeight) * 100;
+                dibujarPoligonoSVG(cMap);
+            }
+        }
 
+        function dibujarPoligonoSVG(cMap) {
+            const container = document.getElementById('editorLocalBox');
+            if(!container.offsetWidth) return;
+            const w = container.offsetWidth, h = container.offsetHeight;
+            document.getElementById('svgPoly').setAttribute('points', `${(cMap.tl.x/100)*w},${(cMap.tl.y/100)*h} ${(cMap.tr.x/100)*w},${(cMap.tr.y/100)*h} ${(cMap.br.x/100)*w},${(cMap.br.y/100)*h} ${(cMap.bl.x/100)*w},${(cMap.bl.y/100)*h}`);
+        }
+
+        function rotar90Rapido() {
+            if(indiceActivo === -1) return;
+            const hoja = documentoHojas[indiceActivo];
+            if(ranuraActiva === 'dorso') { hoja.rotationDorso = (hoja.rotationDorso + 90) % 360; }
+            else { hoja.rotation = (hoja.rotation + 90) % 360; }
+            cargarEditorImagenActiva(); actualizarPrevisualizadorGlobal();
+        }
+
+        function ajustarGiroFinoRuedita() {
+            if(indiceActivo === -1) return;
+            const val = parseInt(document.getElementById('giroRuedita').value);
+            const hoja = documentoHojas[indiceActivo];
+            if(ranuraActiva === 'dorso') { hoja.rueditaGiroFinoDorso = val; document.getElementById('editorImg').style.transform = `rotate(${hoja.rotationDorso + val}deg)`; }
+            else { hoja.rueditaGiroFino = val; document.getElementById('editorImg').style.transform = `rotate(${hoja.rotation + val}deg)`; }
+        }
+
+        function procesarPerspectivaHomograficaManual() {
+            if (!openCvListo) return;
+            const hoja = documentoHojas[indiceActivo];
             const img = new Image();
             img.onload = function() {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                // Reducimos la escala de análisis para que el proceso en teléfonos sea instantáneo
-                const escalaAnalisis = 300; 
-                canvas.width = escalaAnalisis;
-                canvas.height = escalaAnalisis * (img.height / img.width);
-                
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                
-                // Extraemos los datos de píxeles (RGB) crudos de la imagen
-                const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const data = imgData.data;
-                const w = canvas.width;
-                const h = canvas.height;
-
-                // 1. Convertimos a escala de grises y calculamos la luminosidad promedio de fondo
-                let grises = new Uint8Array(w * h);
-                let sumaLuminosidad = 0;
-                for (let i = 0; i < data.length; i += 4) {
-                    // Fórmula estándar de luminancia perceptiva (Gris = 0.299R + 0.587G + 0.114B)
-                    let v = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2];
-                    grises[i/4] = v;
-                    sumaLuminosidad += v;
-                }
-                const umbralPromedio = sumaLuminosidad / (w * h);
-
-                // Variables para encerrar los extremos detectados
-                let minX = w, maxX = 0, minY = h, maxY = 0;
-
-                // 2. Escaneo matricial cruzado buscando el salto del objeto central
-                for (let y = 0; y < h; y++) {
-                    for (let x = 0; x < w; x++) {
-                        let idx = y * w + x;
-                        let val = grises[idx];
-
-                        // Si el píxel difiere significativamente del fondo promedio, es parte del objeto (DNI, servilleta, hoja)
-                        if (Math.abs(val - umbralPromedio) > 28) {
-                            if (x < minX) minX = x;
-                            if (x > maxX) maxX = x;
-                            if (y < minY) minY = y;
-                            if (y > maxY) maxY = y;
-                        }
-                    }
-                }
-
-                // 3. Si la detección fue exitosa y consistente, aplicamos los nuevos porcentajes
-                if (maxX > minX && maxY > minY) {
-                    // Agregamos un pequeño margen de seguridad del 2% para no cortar texto periférico
-                    hoja.crop.x = Math.max(0, (minX / w) * 100 - 2);
-                    hoja.crop.y = Math.max(0, (minY / h) * 100 - 2);
-                    hoja.crop.w = Math.min(100, ((maxX - minX) / w) * 100 + 4);
-                    hoja.crop.h = Math.min(100, ((maxY - minY) / h) * 100 + 4);
-                } else {
-                    // Si la foto es ultra-plana o no hay contraste, encuadra un margen estándar inteligente
-                    hoja.crop = { x: 10, y: 10, w: 80, h: 80 };
-                }
-
-                // Refrescar interfaz con los bordes calculados en vivo
-                btn.innerText = "✨ Auto-detectar Contornos (IA Local)";
-                cargarEditorImagenActiva();
-                actualizarPrevisualizadorGlobal();
+                const canvas = document.getElementById('canvasAux'); const ctx = canvas.getContext('2d');
+                canvas.width = img.width; canvas.height = img.height;
+                const rTotal = (ranuraActiva === 'frente') ? (hoja.rotation + hoja.rueditaGiroFino) : (hoja.rotationDorso + hoja.rueditaGiroFinoDorso);
+                ctx.translate(canvas.width/2, canvas.height/2); ctx.rotate((rTotal * Math.PI) / 180); ctx.drawImage(img, -img.width/2, -img.height/2);
+                let src = cv.imread(canvas); const cMap = (ranuraActiva === 'frente') ? hoja.corners : hoja.cornersDorso;
+                let srcCoords = cv.matFromArray(4, 1, cv.CV_32FC2, [(cMap.tl.x/100)*src.cols, (cMap.tl.y/100)*src.rows, (cMap.tr.x/100)*src.cols, (cMap.tr.y/100)*src.rows, (cMap.br.x/100)*src.cols, (cMap.br.y/100)*src.rows, (cMap.bl.x/100)*src.cols, (cMap.bl.y/100)*src.rows]);
+                let maxW = Math.max(Math.abs((cMap.tr.x - cMap.tl.x)), Math.abs((cMap.br.x - cMap.bl.x))) * (src.cols/100);
+                let maxH = Math.max(Math.abs((cMap.bl.y - cMap.tl.y)), Math.abs((cMap.br.y - cMap.tr.y))) * (src.rows/100);
+                let dstCoords = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, maxW, 0, maxW, maxH, 0, maxH]);
+                let M = cv.getPerspectiveTransform(srcCoords, dstCoords); let transformed = new cv.Mat();
+                cv.warpPerspective(src, transformed, M, new cv.Size(maxW, maxH), cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
+                let outCanvas = document.createElement('canvas'); cv.imshow(outCanvas, transformed);
+                if (ranuraActiva === 'dorso') { hoja.srcDorso = outCanvas.toDataURL('image/jpeg', 0.9); } 
+                else { hoja.src = outCanvas.toDataURL('image/jpeg', 0.9); if(hoja.tipoContenido === 'frente_dorso' && !hoja.srcDorso) ranuraActiva = 'dorso'; }
+                src.delete(); srcCoords.delete(); dstCoords.delete(); M.delete(); transformed.delete();
+                renderizarColaHojas(); cargarEditorImagenActiva();
             };
-            img.src = hoja.src;
-        });
+            img.src = (ranuraActiva === 'dorso') ? hoja.srcDorsoRaw : hoja.srcRaw;
+        }
 
-        async function actualizarPrevisualizadorGlobal() {
-            const mock = document.getElementById('pdfMock');
-            const aviso = document.getElementById('mockAviso');
-            const mockImg = document.getElementById('mockImg');
-            
-            if(indiceActivo === -1 || documentoHojas.length === 0) {
-                aviso.style.display = "block"; mockImg.style.display = "none"; return;
+        // =========================================================================
+        // MOTOR DE REGLAS DINÁMICAS: EL 0,0 SE ALINEA RIGUROSAMENTE CON EL CURSOR
+        // =========================================================================
+        function rediseñarReglasLienzoTecnico(mockWidth, mockHeight, mmW, mmH, e) {
+            const svg = document.getElementById('rulerOverlay');
+            svg.innerHTML = ''; 
+
+            let totalCmX = mmW / 10;
+            let totalCmY = mmH / 10;
+
+            let xCursor = mockWidth / 2;
+            let yCursor = mockHeight / 2;
+
+            if (e) {
+                const rectMock = document.getElementById('pdfMock').getBoundingClientRect();
+                xCursor = Math.max(0, Math.min(e.clientX - rectMock.left, mockWidth));
+                yCursor = Math.max(0, Math.min(e.clientY - rectMock.top, mockHeight));
             }
-            aviso.style.display = "none";
 
-            const hoja = documentoHojas[indiceActivo];
+            // Si el usuario fijó un punto con un clic, se congela el origen en esa coordenada
+            if (puntoCeroFijo) {
+                xCursor = puntoCeroFijo.x;
+                yCursor = puntoCeroFijo.y;
+            }
 
-            let aspecto = (hoja.pdfTamaño === 'a3') ? (297/420) : (hoja.pdfTamaño === 'legal') ? (215.9/355.6) : (hoja.pdfTamaño === 'letter') ? (215.9/279.4) : (210/297);
-            if(hoja.pdfOrientacion === 'l') aspecto = 1 / aspecto;
+            let cmActualX = (xCursor / mockWidth) * totalCmX;
+            let cmActualY = (yCursor / mockHeight) * totalCmY;
 
-            const panelContainer = document.querySelector('.preview-panel');
-            const pHeight = panelContainer.offsetHeight - 60;
-            const pWidth = panelContainer.offsetWidth - 40;
+            // 1. Renderizar Regla Superior Adaptativa (Alineación mm al origen 0)
+            let hRuler = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            hRuler.setAttribute("x", "0"); hRuler.setAttribute("y", "0");
+            hRuler.setAttribute("width", mockWidth); hRuler.setAttribute("height", "22");
+            hRuler.setAttribute("style", "fill:rgba(18, 27, 34, 0.85); stroke:rgba(255,255,255,0.1);");
+            svg.appendChild(hRuler);
 
-            let targetHeight = pHeight; let targetWidth = pHeight * aspecto;
-            if (targetWidth > pWidth) { targetWidth = pWidth; targetHeight = pWidth / aspecto; }
+            for (let i = 0; i <= totalCmX; i++) {
+                let posX = (i / totalCmX) * mockWidth;
+                let line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", posX); line.setAttribute("y1", "0");
+                line.setAttribute("x2", posX); line.setAttribute("y2", i % 5 === 0 ? "14" : "7");
+                line.setAttribute("style", "stroke:rgba(37,211,102,0.6); stroke-width:1;");
+                svg.appendChild(line);
 
-            mock.style.height = targetHeight + "px"; mock.style.width = targetWidth + "px";
+                let deltaX = Math.abs(i - cmActualX);
+                if (i % 2 === 0 && posX < mockWidth - 10 && posX > 10) {
+                    let txt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    txt.setAttribute("x", posX - 4); txt.setAttribute("y", "19");
+                    txt.setAttribute("fill", deltaX < 0.4 ? "#007bff" : "#25D366"); 
+                    txt.setAttribute("font-size", deltaX < 0.4 ? "10px" : "8px");
+                    txt.setAttribute("font-weight", deltaX < 0.4 ? "bold" : "normal");
+                    txt.textContent = Math.round(deltaX);
+                    svg.appendChild(txt);
+                }
+            }
 
-            const finalSrc = await procesarMatrizImagen(hoja);
-            mockImg.src = finalSrc; mockImg.style.display = "block";
+            // 2. Renderizar Regla Lateral Adaptativa
+            let vRuler = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            vRuler.setAttribute("x", "0"); vRuler.setAttribute("y", "0");
+            vRuler.setAttribute("width", "22"); vRuler.setAttribute("height", mockHeight);
+            vRuler.setAttribute("style", "fill:rgba(18, 27, 34, 0.85); stroke:rgba(255,255,255,0.1);");
+            svg.appendChild(vRuler);
 
-            if(hoja.tipoContenido === 'extendido') {
-                mockImg.style.width = "100%"; mockImg.style.height = "100%";
-            } else if(hoja.tipoContenido === 'real') {
-                if(hoja.widthOriginal < 700) { mockImg.style.width = "55%"; mockImg.style.height = "auto"; } 
-                else { mockImg.style.width = "85%"; mockImg.style.height = "auto"; }
-            } else if(hoja.tipoContenido === 'ampliado') {
-                mockImg.style.width = hoja.zoomManual + "%"; mockImg.style.height = "auto";
+            for (let i = 0; i <= totalCmY; i++) {
+                let posY = (i / totalCmY) * mockHeight;
+                let line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                line.setAttribute("x1", "0"); line.setAttribute("y1", posY);
+                line.setAttribute("x2", i % 5 === 0 ? "14" : "7"); line.setAttribute("y2", posY);
+                line.setAttribute("style", "stroke:rgba(37,211,102,0.6); stroke-width:1;");
+                svg.appendChild(line);
+
+                let deltaY = Math.abs(i - cmActualY);
+                if (i % 2 === 0 && posY < mockHeight - 10 && posY > 10) {
+                    let txt = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    txt.setAttribute("x", "14"); txt.setAttribute("y", posY + 3);
+                    txt.setAttribute("fill", deltaY < 0.4 ? "#007bff" : "#25D366");
+                    txt.setAttribute("font-size", deltaY < 0.4 ? "10px" : "8px");
+                    txt.setAttribute("font-weight", deltaY < 0.4 ? "bold" : "normal");
+                    txt.textContent = Math.round(deltaY);
+                    svg.appendChild(txt);
+                }
+            }
+
+            // Trazar guías dinámicas en cruz sobre el lienzo técnico
+            if (e || puntoCeroFijo) {
+                const rectMock = document.getElementById('pdfMock').getBoundingClientRect();
+                let actualX = e ? Math.max(0, Math.min(e.clientX - rectMock.left, mockWidth)) : xCursor;
+                let actualY = e ? Math.max(0, Math.min(e.clientY - rectMock.top, mockHeight)) : yCursor;
+
+                let xLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                xLine.setAttribute("x1", "0"); xLine.setAttribute("y1", actualY);
+                xLine.setAttribute("x2", mockWidth); xLine.setAttribute("y2", actualY);
+                xLine.setAttribute("style", "stroke:#007bff; stroke-width:1.5; stroke-dasharray:3;");
+                svg.appendChild(xLine);
+
+                let yLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                yLine.setAttribute("x1", actualX); yLine.setAttribute("y1", "0");
+                yLine.setAttribute("x2", actualX); yLine.setAttribute("y2", mockHeight);
+                yLine.setAttribute("style", "stroke:#007bff; stroke-width:1.5; stroke-dasharray:3;");
+                svg.appendChild(yLine);
+
+                let circleCenter = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                circleCenter.setAttribute("cx", actualX); circleCenter.setAttribute("cy", actualY);
+                circleCenter.setAttribute("r", "5"); circleCenter.setAttribute("fill", puntoCeroFijo ? "#ffc107" : "#007bff");
+                svg.appendChild(circleCenter);
+
+                // Cálculo de cotas dinámicas respecto al origen fijado por clic
+                let finalCmX = (actualX / mockWidth) * totalCmX;
+                let finalCmY = (actualY / mockHeight) * totalCmY;
+                
+                let distIzq = Math.abs(finalCmX - cmActualX);
+                let distTop = Math.abs(finalCmY - cmActualY);
+
+                let txtInfo = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                txtInfo.setAttribute("x", actualX + 10); txtInfo.setAttribute("y", actualY - 10);
+                txtInfo.setAttribute("fill", "#ffffff"); txtInfo.setAttribute("font-size", "10px");
+                txtInfo.setAttribute("font-weight", "bold");
+                txtInfo.setAttribute("style", "paint-order: stroke; stroke: #121b22; stroke-width: 3px;");
+                
+                if (puntoCeroFijo) {
+                    txtInfo.textContent = `📏 Medida desde Origen: ↔️ ${distIzq.toFixed(1)} cm | ↕️ ${distTop.toFixed(1)} cm`;
+                } else {
+                    txtInfo.textContent = `(0,0) ← ${finalCmX.toFixed(1)} cm | → ${(totalCmX - finalCmX).toFixed(1)} cm | ↑ ${finalCmY.toFixed(1)} cm | ↓ ${(totalCmY - finalCmY).toFixed(1)} cm`;
+                }
+                svg.appendChild(txtInfo);
             }
         }
 
-        function procesarMatrizImagen(hoja) {
-            return new Promise((resolve) => {
-                const img = new Image();
-                img.onload = function() {
-                    const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
-                    let w = img.width; let h = img.height;
-                    if (hoja.rotation === 90 || hoja.rotation === 270) { w = img.height; h = img.width; }
-                    canvas.width = w; canvas.height = h;
+        async function actualizarPrevisualizadorGlobal(eEvent) {
+            const mock = document.getElementById('pdfMock');
+            const aviso = document.getElementById('mockAviso');
+            const wrapperImgs = document.getElementById('containerMockImagenes');
+            const mockImg = document.getElementById('mockImg');
+            const mockImgDorso = document.getElementById('mockImgDorso');
+            
+            if(indiceActivo === -1 || documentoHojas.length === 0) { aviso.style.display = "block"; wrapperImgs.style.display = "none"; return; }
+            aviso.style.display = "none"; wrapperImgs.style.display = "block";
 
-                    ctx.translate(canvas.width / 2, canvas.height / 2);
-                    ctx.rotate((hoja.rotation * Math.PI) / 180);
-                    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+            const hoja = documentoHojas[indiceActivo];
+            
+            let mmW = 210, mmH = 297;
+            if(hoja.pdfTamaño === 'a3') { mmW = 297; mmH = 420; }
+            else if(hoja.pdfTamaño === 'legal') { mmW = 215.9; mmH = 355.6; }
+            else if(hoja.pdfTamaño === 'letter') { mmW = 215.9; mmH = 279.4; }
+            
+            if(hoja.pdfOrientacion === 'l') { let aux = mmW; mmW = mmH; mmH = aux; }
+            let aspectoHoja = mmW / mmH;
 
-                    const cropX = (hoja.crop.x / 100) * canvas.width; const cropY = (hoja.crop.y / 100) * canvas.height;
-                    const cropW = (hoja.crop.w / 100) * canvas.width; const cropH = (hoja.crop.h / 100) * canvas.height;
+            const panelContainer = document.getElementById('previewPanel');
+            const pHeight = panelContainer.offsetHeight - 90;
+            const pWidth = panelContainer.offsetWidth - 90;
 
-                    const cutCanvas = document.createElement('canvas'); cutCanvas.width = cropW; cutCanvas.height = cropH;
-                    cutCanvas.getContext('2d').drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
-                    resolve(cutCanvas.toDataURL('image/jpeg', 0.85));
-                };
-                img.src = hoja.src;
-            });
+            let targetHeight = pHeight; let targetWidth = pHeight * aspectoHoja;
+            if (targetWidth > pWidth) { targetWidth = pWidth; targetHeight = pWidth / aspectoHoja; }
+
+            mock.style.height = targetHeight + "px"; mock.style.width = targetWidth + "px";
+            mockImg.src = hoja.src;
+
+            const imgTemp = new Image();
+            imgTemp.src = hoja.src;
+            imgTemp.onload = function() {
+                let imgAspect = imgTemp.width / imgTemp.height;
+                const factorZoom = hoja.zoomManual / 100;
+
+                if (hoja.tipoContenido === "frente_dorso") {
+                    let baseW = 60 * factorZoom;
+                    let baseH = (60 / imgAspect) * aspectoHoja * factorZoom;
+                    if (baseH > 40) { baseH = 40; baseW = (40 / aspectoHoja) * imgAspect; }
+                    let leftPos = (100 - baseW) / 2;
+
+                    mockImg.style.display = "block"; mockImg.style.position = "absolute"; 
+                    mockImg.style.width = baseW + "%"; mockImg.style.height = baseH + "%";
+                    mockImg.style.top = "8%"; mockImg.style.left = leftPos + "%"; mockImg.style.objectFit = "fill";
+                    
+                    if (hoja.srcDorso) {
+                        mockImgDorso.style.display = "block"; mockImgDorso.src = hoja.srcDorso;
+                        mockImgDorso.style.width = baseW + "%"; mockImgDorso.style.height = baseH + "%";
+                        mockImgDorso.style.top = "52%"; mockImgDorso.style.left = leftPos + "%"; mockImgDorso.style.objectFit = "fill";
+                    } else { mockImgDorso.style.display = "none"; }
+                } 
+                else if (hoja.tipoContenido === "extendido") {
+                    let baseW = 100, baseH = 100;
+                    if (imgAspect > aspectoHoja) { baseH = (100 / imgAspect) * aspectoHoja; } 
+                    else { baseW = (100 * imgAspect) / aspectoHoja; }
+                    mockImgDorso.style.display = "none"; mockImg.style.position = "absolute";
+                    mockImg.style.width = baseW + "%"; mockImg.style.height = baseH + "%";
+                    mockImg.style.top = ((100 - baseH)/2) + "%"; mockImg.style.left = ((100 - baseW)/2) + "%";
+                    mockImg.style.objectFit = "fill";
+                }
+                else {
+                    let escalaBase = (hoja.tipoContenido === 'real') ? 55 : 85;
+                    let baseW = escalaBase * factorZoom;
+                    let baseH = (escalaBase / imgAspect) * aspectoHoja * factorZoom;
+                    if(baseW > 100) { baseW = 100; baseH = (100 / imgAspect) * aspectoHoja; }
+                    if(baseH > 100) { baseH = 100; baseW = (100 * imgAspect) / aspectoHoja; }
+
+                    mockImgDorso.style.display = "none"; mockImg.style.position = "absolute";
+                    mockImg.style.width = baseW + "%"; mockImg.style.height = baseH + "%";
+                    mockImg.style.top = ((100 - baseH)/2) + "%"; mockImg.style.left = ((100 - baseW)/2) + "%";
+                    mockImg.style.objectFit = "fill";
+                }
+                
+                rediseñarReglasLienzoTecnico(targetWidth, targetHeight, mmW, mmH, eEvent);
+            };
+
+            // Enrutamiento de eventos multimedia del puntero
+            panelContainer.onmousemove = function(evt) { actualizarPrevisualizadorGlobal(evt); };
+            panelContainer.ontouchmove = function(evt) { if(evt.touches.length > 0) { actualizarPrevisualizadorGlobal(evt.touches[0]); } };
+            
+            // Asignación del clic de fijación de referencia (Fijar un origen 0,0 estático)
+            mock.onmousedown = function(evt) {
+                const rectMock = mock.getBoundingClientRect();
+                puntoCeroFijo = { x: evt.clientX - rectMock.left, y: evt.clientY - rectMock.top };
+                actualizarPrevisualizadorGlobal(evt);
+            };
+            // Doble clic para liberar la regla y que vuelva a seguir libremente al cursor
+            mock.ondblclick = function(evt) {
+                puntoCeroFijo = null;
+                actualizarPrevisualizadorGlobal(evt);
+            };
+
+            panelContainer.onmouseleave = function() { rediseñarReglasLienzoTecnico(targetWidth, targetHeight, mmW, mmH, null); };
+            panelContainer.ontouchend = function() { rediseñarReglasLienzoTecnico(targetWidth, targetHeight, mmW, mmH, null); };
         }
 
         document.getElementById('btnExportar').addEventListener('click', async () => {
-            const btn = document.getElementById('btnExportar');
-            btn.innerText = "Compilando PDF..."; btn.disabled = true;
+            const btn = document.getElementById('btnExportar'); btn.innerText = "Compilando..."; btn.disabled = true;
             let pdf = null;
 
             for (let i = 0; i < documentoHojas.length; i++) {
@@ -571,24 +719,38 @@
                 else { pdf.addPage(hoja.pdfTamaño, hoja.pdfOrientacion); }
 
                 const pdfW = pdf.internal.pageSize.getWidth(); const pdfH = pdf.internal.pageSize.getHeight();
-                const imgData = await procesarMatrizImagen(hoja);
-                let targetW = pdfW; let targetH = pdfH; let posX = 0; let posY = 0;
+                const aspectoHoja = pdfW / pdfH;
 
-                if(hoja.tipoContenido === 'real') {
-                    if(hoja.widthOriginal < 700) {
-                        targetW = pdfW * 0.55; targetH = pdfH * 0.40; posX = (pdfW - targetW) / 2; posY = (pdfH - targetH) / 2;
-                    }
-                } else if(hoja.tipoContenido === 'ampliado') {
-                    const factor = hoja.zoomManual / 100;
-                    targetW = pdfW * factor; targetH = pdfH * factor; posX = (pdfW - targetW) / 2; posY = (pdfH - targetH) / 2;
+                const imgMedida = await obtenerDimensionesImagenPromesa(hoja.src);
+                let imgAspect = imgMedida.w / imgMedida.height;
+                const factorZoom = hoja.zoomManual / 100;
+
+                if (hoja.tipoContenido === "frente_dorso") {
+                    let targetW = pdfW * 0.60 * factorZoom; let targetH = (pdfW * 0.60 / imgAspect) * factorZoom;
+                    if(targetH > pdfH * 0.40) { targetH = pdfH * 0.40; targetW = pdfH * 0.40 * imgAspect; }
+                    let posX = (pdfW - targetW) / 2;
+                    pdf.addImage(hoja.src, 'JPEG', posX, pdfH * 0.08, targetW, targetH);
+                    if (hoja.srcDorso) { pdf.addImage(hoja.srcDorso, 'JPEG', posX, pdfH * 0.52, targetW, targetH); }
+                } 
+                else if (hoja.tipoContenido === "extendido") {
+                    let targetW = pdfW, targetH = pdfH;
+                    if (imgAspect > aspectoHoja) { targetH = pdfW / imgAspect; } else { targetW = pdfH * imgAspect; }
+                    pdf.addImage(hoja.src, 'JPEG', (pdfW - targetW)/2, (pdfH - targetH)/2, targetW, targetH);
                 }
-                pdf.addImage(imgData, 'JPEG', posX, posY, targetW, targetH);
+                else {
+                    let escalaBase = (hoja.tipoContenido === 'real') ? 0.55 : 0.85;
+                    let targetW = pdfW * escalaBase * factorZoom; let targetH = (pdfW * escalaBase / imgAspect) * factorZoom;
+                    if(targetW > pdfW) { targetW = pdfW; targetH = pdfW / imgAspect; }
+                    if(targetH > pdfH) { targetH = pdfH; targetW = pdfH * imgAspect; }
+                    pdf.addImage(hoja.src, 'JPEG', (pdfW - targetW)/2, (pdfH - targetH)/2, targetW, targetH);
+                }
             }
-            pdf.save('DS_Scanner_Pro.pdf');
-            btn.innerText = "⚙️ Generar y Guardar PDF Final"; btn.disabled = false;
+            pdf.save('DS_Scanner_Pro.pdf'); btn.innerText = "⚙️ Generar y Guardar PDF Final"; btn.disabled = false;
         });
 
-        window.addEventListener('resize', actualizarPrevisualizadorGlobal);
+        function obtenerDimensionesImagenPromesa(src) {
+            return new Promise((resolve) => { const img = new Image(); img.onload = function() { resolve({w: img.width, height: img.height}); }; img.src = src; });
+        }
     </script>
 </body>
 </html>
