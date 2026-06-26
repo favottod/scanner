@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>DS Scanner PDF Pro 100% local</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script async src="https://docs.opencv.org/4.5.4/opencv.js" id="opencv-src"></script>
@@ -39,7 +39,7 @@
             background: white; box-shadow: 0 4px 20px rgba(0,0,0,0.4); display: flex; align-items: center;
             justify-content: center; overflow: hidden; position: relative; max-width: 100%; max-height: 100%;
         }
-        .pdf-canvas-mock img { position: absolute; pointer-events: none; }
+        .pdf-canvas-mock img { position: absolute; object-fit: contain !important; }
         
         .ruler-svg-overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1100;
@@ -91,8 +91,6 @@
         .card-actions { display: flex; gap: 4px; margin-top: 5px; width: 100%; }
         .card-actions button { padding: 4px; font-size: 9px; flex-grow: 1; background: #64748b; color: white; border: none; border-radius: 4px; cursor: pointer; }
         
-        .about-box { font-size: 10px; color: #64748b; padding: 10px 15px; border-top: 1px solid #e2e8f0; background: #f8f9fa; flex-shrink: 0; }
-        
         .camera-modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.9); z-index: 2500; align-items: center; justify-content: center; flex-direction: column;
@@ -103,19 +101,21 @@
 
         #cvLoading { display: none; background: #eab308; color: black; font-size: 11px; padding: 6px; text-align: center; font-weight: bold; margin-bottom: 8px; border-radius: 4px; }
         
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.02); background-color: #128c7e; }
-            100% { transform: scale(1); }
+        @media (max-width: 768px) {
+            body { overflow-y: auto; height: auto; }
+            header { font-size: 14px; padding: 8px 0; }
+            .main-layout { flex-direction: column; height: auto; }
+            .sidebar { width: 100%; max-width: 100%; min-width: 100%; border-right: none; border-bottom: 1px solid #cbd5e1; height: auto; }
+            .sidebar-scroll-content { overflow-y: visible; padding: 12px; }
+            .preview-panel { width: 100%; height: 60vh; min-height: 400px; padding: 15px; }
         }
-        .pulse-btn { animation: pulse 2s infinite; background-color: #075e54; }
     </style>
 </head>
 <body>
 
-    <header>DS Scanner PDF Pro 100% local</header>
+    <header id="appHeader">DS Scanner PDF Pro 100% local</header>
 
-    <div class="main-layout">
+    <div class="main-layout" id="mainLayout">
         <div class="sidebar">
             <div class="sidebar-scroll-content">
                 <div class="btn-group">
@@ -203,19 +203,14 @@
                 </div>
                 <div class="workspace" id="workspace"></div>
             </div>
-
-            <div class="about-box">
-                <strong>Producido por Dani Soft</strong> | Ind. Argentina | Versión 1.0<br>
-                <span style="color:#ef4444; font-weight:bold;">Términos legales:</span> Queda prohibida la copia o ingeniería inversa de este código.
-            </div>
         </div>
 
         <div class="preview-panel" id="previewPanel">
             <div class="pdf-canvas-mock" id="pdfMock">
                 <div id="mockAviso" style="color:#94a3b8; font-size:12px; text-align:center; padding:20px;">No hay contenido para previsualizar.</div>
                 <div id="containerMockImagenes" style="width:100%; height:100%; position:relative; display:none;">
-                    <img id="mockImg" src="" style="position:absolute;">
-                    <img id="mockImgDorso" src="" style="position:absolute; display:none;">
+                    <img id="mockImg" src="">
+                    <img id="mockImgDorso" src="" style="display:none;">
                 </div>
                 <svg class="ruler-svg-overlay" id="rulerOverlay"></svg>
             </div>
@@ -237,7 +232,7 @@
         let ranuraActiva = 'frente'; 
         let openCvListo = false;
         let localStream = null;
-        let puntoCeroFijo = null; // Guardará el anclaje del clic (0,0 fijo)
+        let puntoCeroFijo = null;
 
         document.getElementById('opencv-src').addEventListener('load', () => { openCvListo = true; document.getElementById('cvLoading').style.display = "none"; });
 
@@ -247,7 +242,7 @@
         galleryInput.addEventListener('change', (e) => registrarArchivosMesa(e.target.files));
 
         function dispararCamaraDispositivo() { if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) { cameraInput.click(); } else { abrirWebcamPC(); } }
-        async function abrirWebcamPC() { const modal = document.getElementById('cameraModal'); const video = document.getElementById('videoStream'); try { localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } }); video.srcObject = localStream; modal.style.display = "flex"; } catch (err) { alert("Sin acceso a la cámara de la PC."); } }
+        async function abrirWebcamPC() { const modal = document.getElementById('cameraModal'); const video = document.getElementById('videoStream'); try { localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } }); video.srcObject = localStream; modal.style.display = "flex"; } catch (err) { alert("Sin acceso a la cámara."); } }
         
         function tomarFotoWebcam() { 
             const video = document.getElementById('videoStream'); 
@@ -282,6 +277,9 @@
             } else {
                 let orientacionDeteccion = "p";
                 if (width > height) { orientacionDeteccion = "l"; }
+                
+                let tipoSeleccionado = document.getElementById('tipoContenido').value;
+
                 const hoja = {
                     id: Date.now() + Math.random(),
                     srcRaw: srcBase64, src: srcBase64, srcDorsoRaw: null, srcDorso: null,
@@ -289,7 +287,7 @@
                     corners: { tl: {x: 0, y: 0}, tr: {x: 100, y: 0}, br: {x: 100, y: 100}, bl: {x: 0, y: 100} },
                     cornersDorso: { tl: {x: 0, y: 0}, tr: {x: 100, y: 0}, br: {x: 100, y: 100}, bl: {x: 0, y: 100} },
                     widthOriginal: width, heightOriginal: height, widthDorso: 0, heightDorso: 0,
-                    pdfTamaño: "a4", pdfOrientacion: orientacionDeteccion, tipoContenido: "extendido", zoomManual: 100
+                    pdfTamaño: "a4", pdfOrientacion: orientacionDeteccion, tipoContenido: tipoSeleccionado, zoomManual: 100
                 };
                 documentoHojas.push(hoja); indiceActivo = documentoHojas.length - 1; ranuraActiva = 'frente';
             }
@@ -297,6 +295,7 @@
         }
 
         function cambiarRanuraEdicion(ranura) { ranuraActiva = ranura; cargarEditorImagenActiva(); }
+        
         function cancelarReversoDorso() {
             if(indiceActivo === -1 || !documentoHojas[indiceActivo]) return;
             const hoja = documentoHojas[indiceActivo];
@@ -317,9 +316,10 @@
         function sincronizarSelectoresConHojaActiva() {
             if (indiceActivo === -1 || !documentoHojas[indiceActivo]) return;
             const hoja = documentoHojas[indiceActivo];
+            
+            document.getElementById('tipoContenido').value = hoja.tipoContenido;
             document.getElementById('pdfTamaño').value = hoja.pdfTamaño;
             document.getElementById('pdfOrientacion').value = hoja.pdfOrientacion;
-            document.getElementById('tipoContenido').value = hoja.tipoContenido;
             document.getElementById('zoomManual').value = hoja.zoomManual;
             
             const mostrarZoom = (hoja.tipoContenido === 'ampliado' || hoja.tipoContenido === 'frente_dorso' || hoja.tipoContenido === 'real');
@@ -381,6 +381,7 @@
         function eliminarHoja(index) {
             documentoHojas.splice(index, 1);
             if(indiceActivo >= documentoHojas.length) indiceActivo = documentoHojas.length - 1;
+            ranuraActiva = 'frente';
             renderizarColaHojas();
         }
 
@@ -403,7 +404,8 @@
             } else {
                 img.src = hoja.srcRaw; img.style.transform = `rotate(${hoja.rotation + hoja.rueditaGiroFino}deg)`;
             }
-            armarEsquinasYLineasGraficas(hoja); sincronizarSelectoresConHojaActiva();
+            setTimeout(() => { armarEsquinasYLineasGraficas(hoja); }, 50);
+            sincronizarSelectoresConHojaActiva();
         }
 
         function armarEsquinasYLineasGraficas(hoja) {
@@ -421,20 +423,22 @@
 
         function iniciarMovimientoEsquina(e, pos, cMap, handle, container) {
             e.preventDefault();
-            const startX = e.touches ? e.touches[0].clientX : e.clientX;
-            const startY = e.touches ? e.touches[0].clientY : e.clientY;
+            const touch = e.touches ? e.touches[0] : e;
+            const startX = touch.clientX; const startY = touch.clientY;
             const startLeft = handle.offsetLeft; const startTop = handle.offsetTop;
-            document.onmousemove = (ev) => moverEsquina(ev); document.ontouchmove = (ev) => moverEsquina(ev);
-            document.onmouseup = () => document.onmousemove = document.ontouchmove = null;
-            document.ontouchend = () => document.onmousemove = document.ontouchmove = null;
+            
+            document.onmousemove = moverEsquina; document.ontouchmove = moverEsquina;
+            document.onmouseup = detenerMovimiento; document.ontouchend = detenerMovimiento;
+            
             function moverEsquina(ev) {
-                const cX = ev.touches ? ev.touches[0].clientX : ev.clientX; const cY = ev.touches ? ev.touches[0].clientY : ev.clientY;
-                let l = startLeft + (cX - startX); let t = startTop + (cY - startY);
+                const moveTouch = ev.touches ? ev.touches[0] : ev;
+                let l = startLeft + (moveTouch.clientX - startX); let t = startTop + (moveTouch.clientY - startY);
                 l = Math.max(0, Math.min(l, container.offsetWidth)); t = Math.max(0, Math.min(t, container.offsetHeight));
                 handle.style.left = l + "px"; handle.style.top = t + "px";
                 cMap[pos].x = (l / container.offsetWidth) * 100; cMap[pos].y = (t / container.offsetHeight) * 100;
                 dibujarPoligonoSVG(cMap);
             }
+            function detenerMovimiento() { document.onmousemove = document.ontouchmove = document.onmouseup = document.ontouchend = null; }
         }
 
         function dibujarPoligonoSVG(cMap) {
@@ -477,46 +481,43 @@
                 let M = cv.getPerspectiveTransform(srcCoords, dstCoords); let transformed = new cv.Mat();
                 cv.warpPerspective(src, transformed, M, new cv.Size(maxW, maxH), cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
                 let outCanvas = document.createElement('canvas'); cv.imshow(outCanvas, transformed);
-                if (ranuraActiva === 'dorso') { hoja.srcDorso = outCanvas.toDataURL('image/jpeg', 0.9); } 
-                else { hoja.src = outCanvas.toDataURL('image/jpeg', 0.9); if(hoja.tipoContenido === 'frente_dorso' && !hoja.srcDorso) ranuraActiva = 'dorso'; }
-                src.delete(); srcCoords.delete(); dstCoords.delete(); M.delete(); transformed.delete();
-                renderizarColaHojas(); cargarEditorImagenActiva();
+                
+                if (ranuraActiva === 'dorso') {
+                    hoja.srcDorso = outCanvas.toDataURL('image/jpeg', 0.9);
+                    src.delete(); srcCoords.delete(); dstCoords.delete(); M.delete(); transformed.delete();
+                    renderizarColaHojas(); cargarEditorImagenActiva();
+                } else {
+                    hoja.src = outCanvas.toDataURL('image/jpeg', 0.9);
+                    src.delete(); srcCoords.delete(); dstCoords.delete(); M.delete(); transformed.delete();
+                    
+                    if(hoja.tipoContenido === 'frente_dorso' && !hoja.srcDorso) {
+                        ranuraActiva = 'dorso';
+                    }
+                    renderizarColaHojas(); cargarEditorImagenActiva();
+                }
             };
             img.src = (ranuraActiva === 'dorso') ? hoja.srcDorsoRaw : hoja.srcRaw;
         }
 
-        // =========================================================================
-        // MOTOR DE REGLAS DINÁMICAS: EL 0,0 SE ALINEA RIGUROSAMENTE CON EL CURSOR
-        // =========================================================================
         function rediseñarReglasLienzoTecnico(mockWidth, mockHeight, mmW, mmH, e) {
             const svg = document.getElementById('rulerOverlay');
             svg.innerHTML = ''; 
 
-            let totalCmX = mmW / 10;
-            let totalCmY = mmH / 10;
-
-            let xCursor = mockWidth / 2;
-            let yCursor = mockHeight / 2;
+            let totalCmX = mmW / 10; let totalCmY = mmH / 10;
+            let xCursor = mockWidth / 2; let yCursor = mockHeight / 2;
 
             if (e) {
                 const rectMock = document.getElementById('pdfMock').getBoundingClientRect();
                 xCursor = Math.max(0, Math.min(e.clientX - rectMock.left, mockWidth));
                 yCursor = Math.max(0, Math.min(e.clientY - rectMock.top, mockHeight));
             }
-
-            // Si el usuario fijó un punto con un clic, se congela el origen en esa coordenada
-            if (puntoCeroFijo) {
-                xCursor = puntoCeroFijo.x;
-                yCursor = puntoCeroFijo.y;
-            }
+            if (puntoCeroFijo) { xCursor = puntoCeroFijo.x; yCursor = puntoCeroFijo.y; }
 
             let cmActualX = (xCursor / mockWidth) * totalCmX;
             let cmActualY = (yCursor / mockHeight) * totalCmY;
 
-            // 1. Renderizar Regla Superior Adaptativa (Alineación mm al origen 0)
             let hRuler = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-            hRuler.setAttribute("x", "0"); hRuler.setAttribute("y", "0");
-            hRuler.setAttribute("width", mockWidth); hRuler.setAttribute("height", "22");
+            hRuler.setAttribute("x", "0"); hRuler.setAttribute("y", "0"); hRuler.setAttribute("width", mockWidth); hRuler.setAttribute("height", "22");
             hRuler.setAttribute("style", "fill:rgba(18, 27, 34, 0.85); stroke:rgba(255,255,255,0.1);");
             svg.appendChild(hRuler);
 
@@ -534,13 +535,11 @@
                     txt.setAttribute("x", posX - 4); txt.setAttribute("y", "19");
                     txt.setAttribute("fill", deltaX < 0.4 ? "#007bff" : "#25D366"); 
                     txt.setAttribute("font-size", deltaX < 0.4 ? "10px" : "8px");
-                    txt.setAttribute("font-weight", deltaX < 0.4 ? "bold" : "normal");
                     txt.textContent = Math.round(deltaX);
                     svg.appendChild(txt);
                 }
             }
 
-            // 2. Renderizar Regla Lateral Adaptativa
             let vRuler = document.createElementNS("http://www.w3.org/2000/svg", "rect");
             vRuler.setAttribute("x", "0"); vRuler.setAttribute("y", "0");
             vRuler.setAttribute("width", "22"); vRuler.setAttribute("height", mockHeight);
@@ -561,21 +560,18 @@
                     txt.setAttribute("x", "14"); txt.setAttribute("y", posY + 3);
                     txt.setAttribute("fill", deltaY < 0.4 ? "#007bff" : "#25D366");
                     txt.setAttribute("font-size", deltaY < 0.4 ? "10px" : "8px");
-                    txt.setAttribute("font-weight", deltaY < 0.4 ? "bold" : "normal");
                     txt.textContent = Math.round(deltaY);
                     svg.appendChild(txt);
                 }
             }
 
-            // Trazar guías dinámicas en cruz sobre el lienzo técnico
             if (e || puntoCeroFijo) {
                 const rectMock = document.getElementById('pdfMock').getBoundingClientRect();
                 let actualX = e ? Math.max(0, Math.min(e.clientX - rectMock.left, mockWidth)) : xCursor;
                 let actualY = e ? Math.max(0, Math.min(e.clientY - rectMock.top, mockHeight)) : yCursor;
 
                 let xLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-                xLine.setAttribute("x1", "0"); xLine.setAttribute("y1", actualY);
-                xLine.setAttribute("x2", mockWidth); xLine.setAttribute("y2", actualY);
+                xLine.setAttribute("x1", "0"); xLine.setAttribute("y1", actualY); xLine.setAttribute("x2", mockWidth); xLine.setAttribute("y2", actualY);
                 xLine.setAttribute("style", "stroke:#007bff; stroke-width:1.5; stroke-dasharray:3;");
                 svg.appendChild(xLine);
 
@@ -590,28 +586,23 @@
                 circleCenter.setAttribute("r", "5"); circleCenter.setAttribute("fill", puntoCeroFijo ? "#ffc107" : "#007bff");
                 svg.appendChild(circleCenter);
 
-                // Cálculo de cotas dinámicas respecto al origen fijado por clic
-                let finalCmX = (actualX / mockWidth) * totalCmX;
-                let finalCmY = (actualY / mockHeight) * totalCmY;
-                
-                let distIzq = Math.abs(finalCmX - cmActualX);
-                let distTop = Math.abs(finalCmY - cmActualY);
+                let finalCmX = (actualX / mockWidth) * totalCmX; let finalCmY = (actualY / mockHeight) * totalCmY;
+                let distIzq = Math.abs(finalCmX - cmActualX); let distTop = Math.abs(finalCmY - cmActualY);
 
                 let txtInfo = document.createElementNS("http://www.w3.org/2000/svg", "text");
                 txtInfo.setAttribute("x", actualX + 10); txtInfo.setAttribute("y", actualY - 10);
-                txtInfo.setAttribute("fill", "#ffffff"); txtInfo.setAttribute("font-size", "10px");
-                txtInfo.setAttribute("font-weight", "bold");
+                txtInfo.setAttribute("fill", "#ffffff"); txtInfo.setAttribute("font-size", "10px"); txtInfo.setAttribute("font-weight", "bold");
                 txtInfo.setAttribute("style", "paint-order: stroke; stroke: #121b22; stroke-width: 3px;");
                 
-                if (puntoCeroFijo) {
-                    txtInfo.textContent = `📏 Medida desde Origen: ↔️ ${distIzq.toFixed(1)} cm | ↕️ ${distTop.toFixed(1)} cm`;
-                } else {
-                    txtInfo.textContent = `(0,0) ← ${finalCmX.toFixed(1)} cm | → ${(totalCmX - finalCmX).toFixed(1)} cm | ↑ ${finalCmY.toFixed(1)} cm | ↓ ${(totalCmY - finalCmY).toFixed(1)} cm`;
-                }
+                if (puntoCeroFijo) { txtInfo.textContent = `↔️ ${distIzq.toFixed(1)} cm | ↕️ ${distTop.toFixed(1)} cm`; } 
+                else { txtInfo.textContent = `← ${finalCmX.toFixed(1)} cm | ↑ ${finalCmY.toFixed(1)} cm`; }
                 svg.appendChild(txtInfo);
             }
         }
 
+        // =========================================================================
+        // PREVISUALIZADOR OPTIMIZADO CON COMPENSACIÓN DE PROPORCIONES E IGUALACIÓN DE ANCHO
+        // =========================================================================
         async function actualizarPrevisualizadorGlobal(eEvent) {
             const mock = document.getElementById('pdfMock');
             const aviso = document.getElementById('mockAviso');
@@ -623,7 +614,6 @@
             aviso.style.display = "none"; wrapperImgs.style.display = "block";
 
             const hoja = documentoHojas[indiceActivo];
-            
             let mmW = 210, mmH = 297;
             if(hoja.pdfTamaño === 'a3') { mmW = 297; mmH = 420; }
             else if(hoja.pdfTamaño === 'legal') { mmW = 215.9; mmH = 355.6; }
@@ -633,82 +623,129 @@
             let aspectoHoja = mmW / mmH;
 
             const panelContainer = document.getElementById('previewPanel');
-            const pHeight = panelContainer.offsetHeight - 90;
-            const pWidth = panelContainer.offsetWidth - 90;
+            const pHeight = panelContainer.offsetHeight - 40;
+            const pWidth = panelContainer.offsetWidth - 40;
 
             let targetHeight = pHeight; let targetWidth = pHeight * aspectoHoja;
             if (targetWidth > pWidth) { targetWidth = pWidth; targetHeight = pWidth / aspectoHoja; }
 
             mock.style.height = targetHeight + "px"; mock.style.width = targetWidth + "px";
-            mockImg.src = hoja.src;
 
-            const imgTemp = new Image();
-            imgTemp.src = hoja.src;
-            imgTemp.onload = function() {
-                let imgAspect = imgTemp.width / imgTemp.height;
+            // Cargamos de manera paralela ambas imágenes para calcular sus aspectos nativos cruzados
+            const imgFrente = new Image();
+            imgFrente.src = hoja.src;
+            imgFrente.onload = function() {
+                let aspectFrente = imgFrente.width / imgFrente.height;
                 const factorZoom = hoja.zoomManual / 100;
 
                 if (hoja.tipoContenido === "frente_dorso") {
-                    let baseW = 60 * factorZoom;
-                    let baseH = (60 / imgAspect) * aspectoHoja * factorZoom;
-                    if (baseH > 40) { baseH = 40; baseW = (40 / aspectoHoja) * imgAspect; }
-                    let leftPos = (100 - baseW) / 2;
-
-                    mockImg.style.display = "block"; mockImg.style.position = "absolute"; 
-                    mockImg.style.width = baseW + "%"; mockImg.style.height = baseH + "%";
-                    mockImg.style.top = "8%"; mockImg.style.left = leftPos + "%"; mockImg.style.objectFit = "fill";
-                    
                     if (hoja.srcDorso) {
-                        mockImgDorso.style.display = "block"; mockImgDorso.src = hoja.srcDorso;
-                        mockImgDorso.style.width = baseW + "%"; mockImgDorso.style.height = baseH + "%";
-                        mockImgDorso.style.top = "52%"; mockImgDorso.style.left = leftPos + "%"; mockImgDorso.style.objectFit = "fill";
-                    } else { mockImgDorso.style.display = "none"; }
+                        const imgDorso = new Image();
+                        imgDorso.src = hoja.srcDorso;
+                        imgDorso.onload = function() {
+                            let aspectDorso = imgDorso.width / imgDorso.height;
+
+                            // NORMALIZACIÓN DE ANCHOS IGUALES DE CONTROL MÓVIL
+                            let baseW = 60 * factorZoom;
+                            
+                            // Calculamos el alto individual de cada una basándonos en el ancho unificado
+                            let altoFrenteComponente = (baseW / aspectFrente) * aspectoHoja;
+                            let altoDorsoComponente = (baseW / aspectDorso) * aspectoHoja;
+                            
+                            let altoTotalConjunto = altoFrenteComponente + altoDorsoComponente + 4; // Separación métrica
+
+                            // Si se pasan del límite vertical de la hoja, aplicamos factor de reducción de resguardo
+                            if (altoTotalConjunto > 90) {
+                                let ratioReduccion = 90 / altoTotalConjunto;
+                                baseW = baseW * ratioReduccion;
+                                altoFrenteComponente = altoFrenteComponente * ratioReduccion;
+                                altoDorsoComponente = altoDorsoComponente * ratioReduccion;
+                            }
+
+                            let leftPos = (100 - baseW) / 2;
+                            
+                            // El punto medio (50%) es nuestro eje de pivote simétrico
+                            let topFrente = 50 - altoFrenteComponente - 1;
+                            let topDorso = 50 + 1;
+
+                            mockImg.src = hoja.src;
+                            mockImg.style.display = "block"; 
+                            mockImg.style.width = baseW + "%"; mockImg.style.height = altoFrenteComponente + "%";
+                            mockImg.style.top = topFrente + "%"; mockImg.style.left = leftPos + "%";
+                            mockImg.style.objectFit = "fill"; // Forzado métrico isotrópico controlado
+
+                            mockImgDorso.style.display = "block"; mockImgDorso.src = hoja.srcDorso;
+                            mockImgDorso.style.width = baseW + "%"; mockImgDorso.style.height = altoDorsoComponente + "%";
+                            mockImgDorso.style.top = topDorso + "%"; mockImgDorso.style.left = leftPos + "%";
+                            mockImgDorso.style.objectFit = "fill";
+                        };
+                    } else {
+                        // Modo fallback por si no cargó el reverso todavía
+                        let baseW = 60 * factorZoom;
+                        let baseH = (60 / aspectFrente) * aspectoHoja * factorZoom;
+                        if (baseH > 40) { baseH = 40; baseW = (40 / aspectoHoja) * aspectFrente; }
+                        let leftPos = (100 - baseW) / 2;
+
+                        mockImg.src = hoja.src;
+                        mockImg.style.display = "block"; 
+                        mockImg.style.width = baseW + "%"; mockImg.style.height = baseH + "%";
+                        mockImg.style.top = "8%" + "%"; mockImg.style.left = leftPos + "%";
+                        mockImgDorso.style.display = "none";
+                    }
                 } 
                 else if (hoja.tipoContenido === "extendido") {
                     let baseW = 100, baseH = 100;
-                    if (imgAspect > aspectoHoja) { baseH = (100 / imgAspect) * aspectoHoja; } 
-                    else { baseW = (100 * imgAspect) / aspectoHoja; }
-                    mockImgDorso.style.display = "none"; mockImg.style.position = "absolute";
+                    if (aspectFrente > aspectoHoja) { baseH = (100 / aspectFrente) * aspectoHoja; } 
+                    else { baseW = (100 * aspectFrente) / aspectoHoja; }
+                    mockImgDorso.style.display = "none";
+                    mockImg.src = hoja.src;
                     mockImg.style.width = baseW + "%"; mockImg.style.height = baseH + "%";
                     mockImg.style.top = ((100 - baseH)/2) + "%"; mockImg.style.left = ((100 - baseW)/2) + "%";
                     mockImg.style.objectFit = "fill";
                 }
                 else {
                     let escalaBase = (hoja.tipoContenido === 'real') ? 55 : 85;
-                    let baseW = escalaBase * factorZoom;
-                    let baseH = (escalaBase / imgAspect) * aspectoHoja * factorZoom;
-                    if(baseW > 100) { baseW = 100; baseH = (100 / imgAspect) * aspectoHoja; }
-                    if(baseH > 100) { baseH = 100; baseW = (100 * imgAspect) / aspectoHoja; }
+                    let baseW = escalaBase * factorZoom; let baseH = (escalaBase / aspectFrente) * aspectoHoja * factorZoom;
+                    if(baseW > 100) { baseW = 100; baseH = (100 / aspectFrente) * aspectoHoja; }
+                    if(baseH > 100) { baseH = 100; baseW = (100 * aspectFrente) / aspectoHoja; }
 
-                    mockImgDorso.style.display = "none"; mockImg.style.position = "absolute";
+                    mockImgDorso.style.display = "none";
+                    mockImg.src = hoja.src;
                     mockImg.style.width = baseW + "%"; mockImg.style.height = baseH + "%";
                     mockImg.style.top = ((100 - baseH)/2) + "%"; mockImg.style.left = ((100 - baseW)/2) + "%";
                     mockImg.style.objectFit = "fill";
                 }
-                
                 rediseñarReglasLienzoTecnico(targetWidth, targetHeight, mmW, mmH, eEvent);
             };
 
-            // Enrutamiento de eventos multimedia del puntero
             panelContainer.onmousemove = function(evt) { actualizarPrevisualizadorGlobal(evt); };
             panelContainer.ontouchmove = function(evt) { if(evt.touches.length > 0) { actualizarPrevisualizadorGlobal(evt.touches[0]); } };
             
-            // Asignación del clic de fijación de referencia (Fijar un origen 0,0 estático)
             mock.onmousedown = function(evt) {
                 const rectMock = mock.getBoundingClientRect();
                 puntoCeroFijo = { x: evt.clientX - rectMock.left, y: evt.clientY - rectMock.top };
                 actualizarPrevisualizadorGlobal(evt);
             };
-            // Doble clic para liberar la regla y que vuelva a seguir libremente al cursor
-            mock.ondblclick = function(evt) {
-                puntoCeroFijo = null;
-                actualizarPrevisualizadorGlobal(evt);
-            };
-
-            panelContainer.onmouseleave = function() { rediseñarReglasLienzoTecnico(targetWidth, targetHeight, mmW, mmH, null); };
-            panelContainer.ontouchend = function() { rediseñarReglasLienzoTecnico(targetWidth, targetHeight, mmW, mmH, null); };
+            mock.ondblclick = function() { puntoCeroFijo = null; actualizarPrevisualizadorGlobal(null); };
         }
 
+        function manejarCambioOrientacionYDimensiones() {
+            actualizarPrevisualizadorGlobal(null);
+            setTimeout(() => { if (indiceActivo !== -1) dibujarPoligonoSVG((ranuraActiva === 'frente') ? documentoHojas[indiceActivo].corners : documentoHojas[indiceActivo].cornersDorso); }, 150);
+            
+            if (window.innerHeight < window.innerWidth && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(() => {}); }
+            } else {
+                if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); }
+            }
+        }
+
+        window.addEventListener('resize', manejarCambioOrientacionYDimensiones);
+        window.addEventListener('orientationchange', manejarCambioOrientacionYDimensiones);
+
+        // =========================================================================
+        // COMPILACIÓN DEL PDF CON SECCIÓN DE IGUALACIÓN DE ANCHOS EN VECTOR mm
+        // =========================================================================
         document.getElementById('btnExportar').addEventListener('click', async () => {
             const btn = document.getElementById('btnExportar'); btn.innerText = "Compilando..."; btn.disabled = true;
             let pdf = null;
@@ -721,27 +758,54 @@
                 const pdfW = pdf.internal.pageSize.getWidth(); const pdfH = pdf.internal.pageSize.getHeight();
                 const aspectoHoja = pdfW / pdfH;
 
-                const imgMedida = await obtenerDimensionesImagenPromesa(hoja.src);
-                let imgAspect = imgMedida.w / imgMedida.height;
+                const imgMedidaFrente = await obtenerDimensionesImagenPromesa(hoja.src);
+                let aspectFrente = imgMedidaFrente.w / imgMedidaFrente.height;
                 const factorZoom = hoja.zoomManual / 100;
 
                 if (hoja.tipoContenido === "frente_dorso") {
-                    let targetW = pdfW * 0.60 * factorZoom; let targetH = (pdfW * 0.60 / imgAspect) * factorZoom;
-                    if(targetH > pdfH * 0.40) { targetH = pdfH * 0.40; targetW = pdfH * 0.40 * imgAspect; }
-                    let posX = (pdfW - targetW) / 2;
-                    pdf.addImage(hoja.src, 'JPEG', posX, pdfH * 0.08, targetW, targetH);
-                    if (hoja.srcDorso) { pdf.addImage(hoja.srcDorso, 'JPEG', posX, pdfH * 0.52, targetW, targetH); }
+                    if (hoja.srcDorso) {
+                        const imgMedidaDorso = await obtenerDimensionesImagenPromesa(hoja.srcDorso);
+                        let aspectDorso = imgMedidaDorso.w / imgMedidaDorso.height;
+
+                        // Igualamos el ancho base en milímetros reales
+                        let targetW = pdfW * 0.60 * factorZoom;
+                        
+                        let altoFrenteMm = targetW / aspectFrente;
+                        let altoDorsoMm = targetW / aspectDorso;
+                        let altoConjuntoMm = altoFrenteMm + altoDorsoMm + 6; // Margen mm en papel
+
+                        // Si desborda verticalmente reducimos proporcionalmente
+                        if (altoConjuntoMm > pdfH * 0.90) {
+                            let globalRatio = (pdfH * 0.90) / altoConjuntoMm;
+                            targetW = targetW * globalRatio;
+                            altoFrenteMm = altoFrenteMm * globalRatio;
+                            altoDorsoMm = altoDorsoMm * globalRatio;
+                        }
+
+                        let posX = (pdfW - targetW) / 2;
+                        let centroPapelY = pdfH / 2;
+                        
+                        // Centramos verticalmente acoplando las dos caras hacia la línea divisoria
+                        let posYFrente = centroPapelY - altoFrenteMm - 2;
+                        let posYDorso = centroPapelY + 2;
+
+                        pdf.addImage(hoja.src, 'JPEG', posX, posYFrente, targetW, altoFrenteMm);
+                        pdf.addImage(hoja.srcDorso, 'JPEG', posX, posYDorso, targetW, altoDorsoMm);
+                    } else {
+                        let targetW = pdfW * 0.60 * factorZoom; let targetH = (pdfW * 0.60 / aspectFrente) * factorZoom;
+                        pdf.addImage(hoja.src, 'JPEG', (pdfW - targetW)/2, pdfH * 0.08, targetW, targetH);
+                    }
                 } 
                 else if (hoja.tipoContenido === "extendido") {
                     let targetW = pdfW, targetH = pdfH;
-                    if (imgAspect > aspectoHoja) { targetH = pdfW / imgAspect; } else { targetW = pdfH * imgAspect; }
+                    if (aspectFrente > aspectoHoja) { targetH = pdfW / aspectFrente; } else { targetW = pdfH * aspectFrente; }
                     pdf.addImage(hoja.src, 'JPEG', (pdfW - targetW)/2, (pdfH - targetH)/2, targetW, targetH);
                 }
                 else {
                     let escalaBase = (hoja.tipoContenido === 'real') ? 0.55 : 0.85;
-                    let targetW = pdfW * escalaBase * factorZoom; let targetH = (pdfW * escalaBase / imgAspect) * factorZoom;
-                    if(targetW > pdfW) { targetW = pdfW; targetH = pdfW / imgAspect; }
-                    if(targetH > pdfH) { targetH = pdfH; targetW = pdfH * imgAspect; }
+                    let targetW = pdfW * escalaBase * factorZoom; let targetH = (pdfW * escalaBase / aspectFrente) * factorZoom;
+                    if(targetW > pdfW) { targetW = pdfW; targetH = pdfW / aspectFrente; }
+                    if(targetH > pdfH) { targetH = pdfH; targetW = pdfH * aspectFrente; }
                     pdf.addImage(hoja.src, 'JPEG', (pdfW - targetW)/2, (pdfH - targetH)/2, targetW, targetH);
                 }
             }
