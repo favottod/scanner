@@ -12,6 +12,7 @@
             --dark: #121b22;
             --light: #f0f2f5;
             --accent: #007bff;
+            --danger: #ef4444;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
@@ -63,9 +64,9 @@
         .editor-local-box img { width: 100%; display: block; user-select: none; }
         
         .corner-handle {
-            position: absolute; width: 24px; height: 24px; background: var(--primary);
+            position: absolute; width: 28px; height: 24px; background: var(--primary);
             border: 3px solid white; border-radius: 50%; cursor: move; z-index: 100;
-            transform: translate(-12px, -12px); box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            transform: translate(-14px, -12px); box-shadow: 0 3px 8px rgba(0,0,0,0.4);
         }
         .svg-overlay { position: absolute; top:0; left:0; width:100%; height:100%; pointer-events: none; z-index: 50; }
 
@@ -183,6 +184,7 @@
                                 <div id="preview_slot_dorso">- Vacío -</div>
                             </div>
                         </div>
+                        <button type="button" id="btnConfirmarYReiniciar" onclick="confirmarHojaYReiniciarInterfaz()" style="width:100%; background: #15803d; font-size:12px; padding:8px; margin-top:6px; font-weight:bold; color:white; border:none; border-radius:5px;">✅ Confirmar y Escanear Siguiente Documento</button>
                         <button type="button" id="btnLimpiarDorso" onclick="cancelarReversoDorso()" style="width:100%; background:#6c757d; font-size:10px; padding:4px; margin-top:4px; min-height:20px; display:none;">❌ Cancelar / Limpiar Reverso</button>
                     </div>
 
@@ -272,7 +274,7 @@
                 const hoja = documentoHojas[indiceActivo];
                 hoja.srcDorsoRaw = srcBase64; hoja.srcDorso = srcBase64;
                 hoja.widthDorso = width; hoja.heightDorso = height;
-                hoja.cornersDorso = { tl: {x: 0, y: 0}, tr: {x: 100, y: 0}, br: {x: 100, y: 100}, bl: {x: 0, y: 100} };
+                hoja.cornersDorso = { tl: {x: 10, y: 10}, tr: {x: 90, y: 10}, br: {x: 90, y: 90}, bl: {x: 10, y: 90} };
                 hoja.rotationDorso = 0; hoja.rueditaGiroFinoDorso = 0;
             } else {
                 let orientacionDeteccion = "p";
@@ -284,8 +286,8 @@
                     id: Date.now() + Math.random(),
                     srcRaw: srcBase64, src: srcBase64, srcDorsoRaw: null, srcDorso: null,
                     rotation: 0, rueditaGiroFino: 0, rotationDorso: 0, rueditaGiroFinoDorso: 0,
-                    corners: { tl: {x: 0, y: 0}, tr: {x: 100, y: 0}, br: {x: 100, y: 100}, bl: {x: 0, y: 100} },
-                    cornersDorso: { tl: {x: 0, y: 0}, tr: {x: 100, y: 0}, br: {x: 100, y: 100}, bl: {x: 0, y: 100} },
+                    corners: { tl: {x: 10, y: 10}, tr: {x: 90, y: 10}, br: {x: 90, y: 90}, bl: {x: 10, y: 90} },
+                    cornersDorso: { tl: {x: 10, y: 10}, tr: {x: 90, y: 10}, br: {x: 90, y: 90}, bl: {x: 10, y: 90} },
                     widthOriginal: width, heightOriginal: height, widthDorso: 0, heightDorso: 0,
                     pdfTamaño: "a4", pdfOrientacion: orientacionDeteccion, tipoContenido: tipoSeleccionado, zoomManual: 100
                 };
@@ -303,6 +305,14 @@
             renderizarColaHojas(); cargarEditorImagenActiva();
         }
 
+        function confirmarHojaYReiniciarInterfaz() {
+            if (indiceActivo === -1) return;
+            document.getElementById('editorLocalBox').style.display = "none";
+            document.getElementById('wrapperGiroManual').style.display = "none";
+            indiceActivo = -1; ranuraActiva = 'frente';
+            renderizarColaHojas();
+        }
+
         function guardarCambiosHojaActiva() {
             if (indiceActivo === -1 || !documentoHojas[indiceActivo]) return;
             const hoja = documentoHojas[indiceActivo];
@@ -314,7 +324,12 @@
         }
 
         function sincronizarSelectoresConHojaActiva() {
-            if (indiceActivo === -1 || !documentoHojas[indiceActivo]) return;
+            if (indiceActivo === -1 || !documentoHojas[indiceActivo]) {
+                document.getElementById('wrapperZoomManual').style.display = "none";
+                document.getElementById('wrapperSlotsCredencial').style.display = "none";
+                document.getElementById('btnCapturarGatillo').innerText = "📷 Capturar Foto";
+                return;
+            }
             const hoja = documentoHojas[indiceActivo];
             
             document.getElementById('tipoContenido').value = hoja.tipoContenido;
@@ -465,22 +480,37 @@
         }
 
         function procesarPerspectivaHomograficaManual() {
-            if (!openCvListo) return;
+            if (!openCvListo || indiceActivo === -1) return;
             const hoja = documentoHojas[indiceActivo];
             const img = new Image();
+            img.src = (ranuraActiva === 'dorso') ? hoja.srcDorsoRaw : hoja.srcRaw;
+            
             img.onload = function() {
                 const canvas = document.getElementById('canvasAux'); const ctx = canvas.getContext('2d');
                 canvas.width = img.width; canvas.height = img.height;
+                
                 const rTotal = (ranuraActiva === 'frente') ? (hoja.rotation + hoja.rueditaGiroFino) : (hoja.rotationDorso + hoja.rueditaGiroFinoDorso);
                 ctx.translate(canvas.width/2, canvas.height/2); ctx.rotate((rTotal * Math.PI) / 180); ctx.drawImage(img, -img.width/2, -img.height/2);
-                let src = cv.imread(canvas); const cMap = (ranuraActiva === 'frente') ? hoja.corners : hoja.cornersDorso;
-                let srcCoords = cv.matFromArray(4, 1, cv.CV_32FC2, [(cMap.tl.x/100)*src.cols, (cMap.tl.y/100)*src.rows, (cMap.tr.x/100)*src.cols, (cMap.tr.y/100)*src.rows, (cMap.br.x/100)*src.cols, (cMap.br.y/100)*src.rows, (cMap.bl.x/100)*src.cols, (cMap.bl.y/100)*src.rows]);
+                
+                let src = cv.imread(canvas); 
+                const cMap = (ranuraActiva === 'frente') ? hoja.corners : hoja.cornersDorso;
+
+                let srcCoords = cv.matFromArray(4, 1, cv.CV_32FC2, [
+                    (cMap.tl.x/100)*src.cols, (cMap.tl.y/100)*src.rows, 
+                    (cMap.tr.x/100)*src.cols, (cMap.tr.y/100)*src.rows, 
+                    (cMap.br.x/100)*src.cols, (cMap.br.y/100)*src.rows, 
+                    (cMap.bl.x/100)*src.cols, (cMap.bl.y/100)*src.rows
+                ]);
+
                 let maxW = Math.max(Math.abs((cMap.tr.x - cMap.tl.x)), Math.abs((cMap.br.x - cMap.bl.x))) * (src.cols/100);
                 let maxH = Math.max(Math.abs((cMap.bl.y - cMap.tl.y)), Math.abs((cMap.br.y - cMap.tr.y))) * (src.rows/100);
+
                 let dstCoords = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, maxW, 0, maxW, maxH, 0, maxH]);
                 let M = cv.getPerspectiveTransform(srcCoords, dstCoords); let transformed = new cv.Mat();
                 cv.warpPerspective(src, transformed, M, new cv.Size(maxW, maxH), cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar());
-                let outCanvas = document.createElement('canvas'); cv.imshow(outCanvas, transformed);
+                
+                let outCanvas = document.createElement('canvas'); 
+                cv.imshow(outCanvas, transformed);
                 
                 if (ranuraActiva === 'dorso') {
                     hoja.srcDorso = outCanvas.toDataURL('image/jpeg', 0.9);
@@ -489,14 +519,10 @@
                 } else {
                     hoja.src = outCanvas.toDataURL('image/jpeg', 0.9);
                     src.delete(); srcCoords.delete(); dstCoords.delete(); M.delete(); transformed.delete();
-                    
-                    if(hoja.tipoContenido === 'frente_dorso' && !hoja.srcDorso) {
-                        ranuraActiva = 'dorso';
-                    }
+                    if(hoja.tipoContenido === 'frente_dorso' && !hoja.srcDorso) { ranuraActiva = 'dorso'; }
                     renderizarColaHojas(); cargarEditorImagenActiva();
                 }
             };
-            img.src = (ranuraActiva === 'dorso') ? hoja.srcDorsoRaw : hoja.srcRaw;
         }
 
         function rediseñarReglasLienzoTecnico(mockWidth, mockHeight, mmW, mmH, e) {
@@ -600,9 +626,6 @@
             }
         }
 
-        // =========================================================================
-        // PREVISUALIZADOR OPTIMIZADO CON COMPENSACIÓN DE PROPORCIONES E IGUALACIÓN DE ANCHO
-        // =========================================================================
         async function actualizarPrevisualizadorGlobal(eEvent) {
             const mock = document.getElementById('pdfMock');
             const aviso = document.getElementById('mockAviso');
@@ -610,10 +633,22 @@
             const mockImg = document.getElementById('mockImg');
             const mockImgDorso = document.getElementById('mockImgDorso');
             
-            if(indiceActivo === -1 || documentoHojas.length === 0) { aviso.style.display = "block"; wrapperImgs.style.display = "none"; return; }
+            if(indiceActivo === -1 || documentoHojas.length === 0) {
+                if (documentoHojas.length > 0) {
+                    aviso.style.display = "none"; wrapperImgs.style.display = "block";
+                    const ultimaHoja = documentoHojas[documentoHojas.length - 1];
+                    renderizarVistaHojaEspecifica(ultimaHoja, mock, wrapperImgs, mockImg, mockImgDorso, eEvent);
+                } else {
+                    aviso.style.display = "block"; wrapperImgs.style.display = "none";
+                }
+                return;
+            }
             aviso.style.display = "none"; wrapperImgs.style.display = "block";
-
             const hoja = documentoHojas[indiceActivo];
+            renderizarVistaHojaEspecifica(hoja, mock, wrapperImgs, mockImg, mockImgDorso, eEvent);
+        }
+
+        function renderizarVistaHojaEspecifica(hoja, mock, wrapperImgs, mockImg, mockImgDorso, eEvent) {
             let mmW = 210, mmH = 297;
             if(hoja.pdfTamaño === 'a3') { mmW = 297; mmH = 420; }
             else if(hoja.pdfTamaño === 'legal') { mmW = 215.9; mmH = 355.6; }
@@ -631,7 +666,6 @@
 
             mock.style.height = targetHeight + "px"; mock.style.width = targetWidth + "px";
 
-            // Cargamos de manera paralela ambas imágenes para calcular sus aspectos nativos cruzados
             const imgFrente = new Image();
             imgFrente.src = hoja.src;
             imgFrente.onload = function() {
@@ -645,16 +679,11 @@
                         imgDorso.onload = function() {
                             let aspectDorso = imgDorso.width / imgDorso.height;
 
-                            // NORMALIZACIÓN DE ANCHOS IGUALES DE CONTROL MÓVIL
                             let baseW = 60 * factorZoom;
-                            
-                            // Calculamos el alto individual de cada una basándonos en el ancho unificado
                             let altoFrenteComponente = (baseW / aspectFrente) * aspectoHoja;
                             let altoDorsoComponente = (baseW / aspectDorso) * aspectoHoja;
-                            
-                            let altoTotalConjunto = altoFrenteComponente + altoDorsoComponente + 4; // Separación métrica
+                            let altoTotalConjunto = altoFrenteComponente + altoDorsoComponente + 4;
 
-                            // Si se pasan del límite vertical de la hoja, aplicamos factor de reducción de resguardo
                             if (altoTotalConjunto > 90) {
                                 let ratioReduccion = 90 / altoTotalConjunto;
                                 baseW = baseW * ratioReduccion;
@@ -663,8 +692,6 @@
                             }
 
                             let leftPos = (100 - baseW) / 2;
-                            
-                            // El punto medio (50%) es nuestro eje de pivote simétrico
                             let topFrente = 50 - altoFrenteComponente - 1;
                             let topDorso = 50 + 1;
 
@@ -672,7 +699,7 @@
                             mockImg.style.display = "block"; 
                             mockImg.style.width = baseW + "%"; mockImg.style.height = altoFrenteComponente + "%";
                             mockImg.style.top = topFrente + "%"; mockImg.style.left = leftPos + "%";
-                            mockImg.style.objectFit = "fill"; // Forzado métrico isotrópico controlado
+                            mockImg.style.objectFit = "fill";
 
                             mockImgDorso.style.display = "block"; mockImgDorso.src = hoja.srcDorso;
                             mockImgDorso.style.width = baseW + "%"; mockImgDorso.style.height = altoDorsoComponente + "%";
@@ -680,7 +707,6 @@
                             mockImgDorso.style.objectFit = "fill";
                         };
                     } else {
-                        // Modo fallback por si no cargó el reverso todavía
                         let baseW = 60 * factorZoom;
                         let baseH = (60 / aspectFrente) * aspectoHoja * factorZoom;
                         if (baseH > 40) { baseH = 40; baseW = (40 / aspectoHoja) * aspectFrente; }
@@ -689,7 +715,7 @@
                         mockImg.src = hoja.src;
                         mockImg.style.display = "block"; 
                         mockImg.style.width = baseW + "%"; mockImg.style.height = baseH + "%";
-                        mockImg.style.top = "8%" + "%"; mockImg.style.left = leftPos + "%";
+                        mockImg.style.top = "8%"; mockImg.style.left = leftPos + "%";
                         mockImgDorso.style.display = "none";
                     }
                 } 
@@ -732,7 +758,6 @@
         function manejarCambioOrientacionYDimensiones() {
             actualizarPrevisualizadorGlobal(null);
             setTimeout(() => { if (indiceActivo !== -1) dibujarPoligonoSVG((ranuraActiva === 'frente') ? documentoHojas[indiceActivo].corners : documentoHojas[indiceActivo].cornersDorso); }, 150);
-            
             if (window.innerHeight < window.innerWidth && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
                 if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(() => {}); }
             } else {
@@ -743,9 +768,6 @@
         window.addEventListener('resize', manejarCambioOrientacionYDimensiones);
         window.addEventListener('orientationchange', manejarCambioOrientacionYDimensiones);
 
-        // =========================================================================
-        // COMPILACIÓN DEL PDF CON SECCIÓN DE IGUALACIÓN DE ANCHOS EN VECTOR mm
-        // =========================================================================
         document.getElementById('btnExportar').addEventListener('click', async () => {
             const btn = document.getElementById('btnExportar'); btn.innerText = "Compilando..."; btn.disabled = true;
             let pdf = null;
@@ -767,14 +789,11 @@
                         const imgMedidaDorso = await obtenerDimensionesImagenPromesa(hoja.srcDorso);
                         let aspectDorso = imgMedidaDorso.w / imgMedidaDorso.height;
 
-                        // Igualamos el ancho base en milímetros reales
                         let targetW = pdfW * 0.60 * factorZoom;
-                        
                         let altoFrenteMm = targetW / aspectFrente;
                         let altoDorsoMm = targetW / aspectDorso;
-                        let altoConjuntoMm = altoFrenteMm + altoDorsoMm + 6; // Margen mm en papel
+                        let altoConjuntoMm = altoFrenteMm + altoDorsoMm + 6;
 
-                        // Si desborda verticalmente reducimos proporcionalmente
                         if (altoConjuntoMm > pdfH * 0.90) {
                             let globalRatio = (pdfH * 0.90) / altoConjuntoMm;
                             targetW = targetW * globalRatio;
@@ -784,8 +803,6 @@
 
                         let posX = (pdfW - targetW) / 2;
                         let centroPapelY = pdfH / 2;
-                        
-                        // Centramos verticalmente acoplando las dos caras hacia la línea divisoria
                         let posYFrente = centroPapelY - altoFrenteMm - 2;
                         let posYDorso = centroPapelY + 2;
 
@@ -809,7 +826,22 @@
                     pdf.addImage(hoja.src, 'JPEG', (pdfW - targetW)/2, (pdfH - targetH)/2, targetW, targetH);
                 }
             }
-            pdf.save('DS_Scanner_Pro.pdf'); btn.innerText = "⚙️ Generar y Guardar PDF Final"; btn.disabled = false;
+
+            // =========================================================================
+            // LÓGICA DE NOMBRE DINÁMICO CRONOLÓGICO ("DS_Scaner_Pro_AAAAMMDDHHMMSS.pdf")
+            // =========================================================================
+            const ahora = new Date();
+            const anio = ahora.getFullYear();
+            const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+            const dia = String(ahora.getDate()).padStart(2, '0');
+            const horas = String(ahora.getHours()).padStart(2, '0');
+            const minutos = String(ahora.getMinutes()).padStart(2, '0');
+            const segundos = String(ahora.getSeconds()).padStart(2, '0');
+
+            const nombreArchivo = `DS_Scaner_Pro_${anio}${mes}${dia}${horas}${minutos}${segundos}.pdf`;
+
+            pdf.save(nombreArchivo); 
+            btn.innerText = "⚙️ Generar y Guardar PDF Final"; btn.disabled = false;
         });
 
         function obtenerDimensionesImagenPromesa(src) {
