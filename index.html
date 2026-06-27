@@ -13,6 +13,8 @@
             --light: #f0f2f5;
             --accent: #007bff;
             --danger: #ef4444;
+            --text-muted: #64748b;
+            --border-color: #cbd5e1;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
@@ -27,7 +29,7 @@
         
         .sidebar {
             width: 40%; max-width: 450px; min-width: 320px; background: white;
-            border-right: 1px solid #cbd5e1; display: flex; flex-direction: column; box-sizing: border-box;
+            border-right: 1px solid var(--border-color); display: flex; flex-direction: column; box-sizing: border-box;
         }
         .sidebar-scroll-content { flex-grow: 1; overflow-y: auto; padding: 15px; }
 
@@ -58,7 +60,7 @@
         
         .config-section { background: #f8f9fa; padding: 10px; border-radius: 6px; margin-bottom: 12px; border: 1px solid #e2e8f0; }
         .config-section label { font-size: 11px; color: #4a5568; font-weight: bold; }
-        select, input[type="range"] { width: 100%; padding: 6px; margin-top: 2px; margin-bottom: 6px; border-radius: 4px; border: 1px solid #cbd5e1; font-size: 12px; box-sizing: border-box; }
+        select, input[type="range"] { width: 100%; padding: 6px; margin-top: 2px; margin-bottom: 6px; border-radius: 4px; border: 1px solid var(--border-color); font-size: 12px; box-sizing: border-box; }
         
         .editor-local-box { position: relative; width: 100%; background: #000; overflow: hidden; margin-bottom: 10px; display: none; }
         .editor-local-box img { width: 100%; display: block; user-select: none; }
@@ -92,27 +94,110 @@
         .card-actions { display: flex; gap: 4px; margin-top: 5px; width: 100%; }
         .card-actions button { padding: 4px; font-size: 9px; flex-grow: 1; background: #64748b; color: white; border: none; border-radius: 4px; cursor: pointer; }
         
-        .camera-modal {
+        .camera-modal, .help-modal {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.9); z-index: 2500; align-items: center; justify-content: center; flex-direction: column;
+            background: rgba(0,0,0,0.85); z-index: 2500; align-items: center; justify-content: center; flex-direction: column;
         }
         .camera-modal video { width: 85%; max-width: 640px; border: 3px solid var(--primary); border-radius: 12px; background: black; }
         .camera-controls { margin-top: 15px; display: flex; gap: 10px; }
         .camera-controls button { min-width: 120px; }
 
-        #cvLoading { display: none; background: #eab308; color: black; font-size: 11px; padding: 6px; text-align: center; font-weight: bold; margin-bottom: 8px; border-radius: 4px; }
-        
-        @media (max-width: 768px) {
-            body { overflow-y: auto; height: auto; }
-            header { font-size: 14px; padding: 8px 0; }
-            .main-layout { flex-direction: column; height: auto; }
-            .sidebar { width: 100%; max-width: 100%; min-width: 100%; border-right: none; border-bottom: 1px solid #cbd5e1; height: auto; }
-            .sidebar-scroll-content { overflow-y: visible; padding: 12px; }
-            .preview-panel { width: 100%; height: 60vh; min-height: 400px; padding: 15px; }
+        /* =========================================================================
+           REDDISEÑO MODERNO Y SUTIL DEL FOOTER Y BOTÓN DE ASISTENCIA
+           ========================================================================= */
+        .about-box { 
+            font-size: 11px; 
+            color: var(--text-muted); 
+            padding: 16px 20px; 
+            border-top: 1px solid #e2e8f0; 
+            background: #f8f9fa; 
+            flex-shrink: 0;
+            line-height: 1.6;
         }
+        .about-box strong {
+            color: #334155;
+        }
+        .help-trigger-card {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            padding: 10px 12px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            cursor: pointer;
+            color: #475569;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+        .help-trigger-card:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: #f0f7ff;
+        }
+        .help-trigger-card svg {
+            width: 16px; height: 16px; fill: currentColor;
+        }
+
+        /* DISEÑO DE CONTENEDORES CANVA DENTRO DEL MANUAL DE AYUDA */
+        .help-content-card {
+            background: white; width: 92%; max-width: 650px; max-height: 85vh; border-radius: 16px; padding: 28px; overflow-y: auto; box-sizing: border-box; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.15);
+        }
+        .help-content-card h2 { margin-top: 0; color: #1e293b; border-bottom: 2px solid var(--primary); padding-bottom: 6px; font-size: 20px; font-weight: 800; }
+        .help-content-card h3 { font-size: 15px; margin-top: 20px; margin-bottom: 6px; color: var(--accent); font-weight: 700; }
+        .help-content-card p, .help-content-card li { font-size: 12.5px; line-height: 1.6; color: #475569; }
+        .help-content-card ul { padding-left: 20px; margin: 6px 0; }
+        .graphic-canvas-container { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; display: block; margin: 12px 0; width: 100%; height: 130px; box-sizing: border-box; }
+
+        /* SPLASH SCREEN INICIAL */
+        .splash-screen-container {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            z-index: 9999; display: flex; flex-direction: column; align-items: center;
+            justify-content: center; transition: opacity 0.5s ease, visibility 0.5s ease;
+            box-sizing: border-box; padding: 20px; text-align: center;
+        }
+        .splash-logo-box { display: flex; flex-direction: column; align-items: center; justify-content: center; flex-grow: 1; }
+        .splash-icon {
+            width: 100px; height: 100px; background: var(--dark); border: 4px solid var(--primary);
+            border-radius: 24px; display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 30px rgba(37, 211, 102, 0.4); animation: pulseGlow 2s infinite ease-in-out;
+        }
+        .splash-icon svg { width: 55px; height: 55px; fill: var(--primary); }
+        .splash-title { color: white; font-size: 28px; font-weight: 800; margin: 20px 0 5px 0; letter-spacing: 0.5px; }
+        .splash-subtitle { color: var(--primary); font-size: 14px; font-weight: bold; text-transform: uppercase; letter-spacing: 2px; }
+        .splash-footer { color: #94a3b8; font-size: 11px; font-weight: 500; margin-bottom: 25px; letter-spacing: 0.5px; }
+        .splash-close-btn {
+            position: absolute; top: 20px; right: 20px; width: 40px; height: 40px;
+            background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 50%; color: white; font-size: 18px; font-weight: bold; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; z-index: 10000;
+        }
+        @keyframes pulseGlow {
+            0% { transform: scale(1); box-shadow: 0 0 25px rgba(37, 211, 102, 0.3); }
+            50% { transform: scale(1.05); box-shadow: 0 0 45px rgba(37, 211, 102, 0.6); }
+            100% { transform: scale(1); box-shadow: 0 0 25px rgba(37, 211, 102, 0.3); }
+        }
+
+        #cvLoading { display: none; background: #eab308; color: black; font-size: 11px; padding: 6px; text-align: center; font-weight: bold; margin-bottom: 8px; border-radius: 4px; }
     </style>
 </head>
 <body>
+
+    <div id="appSplashScreen" class="splash-screen-container">
+        <button class="splash-close-btn" onclick="omitirSplashScreenInmediato()">✕</button>
+        <div class="splash-logo-box">
+            <div class="splash-icon">
+                <svg viewBox="0 0 24 24">
+                    <path d="M4 4h6V2H4c-1.1 0-2 .9-2 2v6h2V4zm16-2h-6v2h6v6h2V4c0-1.1-.9-2-2-2zM4 20H4c0 1.1.9 2 2 2h6v-2H4v-6H2v6zm16 2h-6v-2h6v-6h2v6c0 1.1-.9 2-2 2zM7 9h10v2H7V9zm0 4h10v2H7v-2z"/>
+                </svg>
+            </div>
+            <div class="splash-title">DS Scanner Pro</div>
+            <div class="splash-subtitle">100% Local AI Framework</div>
+        </div>
+        <div class="splash-footer">Producido por Dani Soft Argentina 2026</div>
+    </div>
 
     <header id="appHeader">DS Scanner PDF Pro 100% local</header>
 
@@ -127,6 +212,7 @@
 
                 <div id="cvLoading">⏳ Cargando Motores de Visión Artificial...</div>
 
+                <!-- ÁREA DE AJUSTE MANUAL TRAPEZOIDAL -->
                 <div class="editor-local-box" id="editorLocalBox">
                     <svg class="svg-overlay" id="svgLines"><polygon id="svgPoly" points="" style="fill:rgba(37,211,102,0.15); stroke:#25D366; stroke-width:2; stroke-dasharray:4;" /></svg>
                     <img id="editorImg" src="">
@@ -138,6 +224,7 @@
                     <div class="corner-handle" id="pt_bl"></div>
                 </div>
 
+                <!-- HERRAMIENTA DE GIRO FINO -->
                 <div class="config-section" id="wrapperGiroManual" style="display:none;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <label>🔄 AJUSTE DE ORIENTACIÓN Y PERSPECTIVA:</label>
@@ -205,8 +292,17 @@
                 </div>
                 <div class="workspace" id="workspace"></div>
             </div>
+            
+            <div class="about-box">
+                <div>Producido por <strong>Dani Soft</strong> | Ind. Argentina | v1.4</div>
+                <div class="help-trigger-card" onclick="abrirManualAyudaTecnica()">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 16h-2v-2h2v2zm1.07-7.75l-.9.92C12.45 11.9 12 12.5 12 14h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z"/></svg>
+                    <span>Manual de Ayuda y Términos</span>
+                </div>
+            </div>
         </div>
 
+        <!-- PANEL PREVISUALIZADOR TÉCNICO -->
         <div class="preview-panel" id="previewPanel">
             <div class="pdf-canvas-mock" id="pdfMock">
                 <div id="mockAviso" style="color:#94a3b8; font-size:12px; text-align:center; padding:20px;">No hay contenido para previsualizar.</div>
@@ -227,6 +323,71 @@
         </div>
     </div>
 
+    <!-- MODAL MANUAL DE ASISTENCIA TÉCNICA DETALLADO (ESTILO CANVA) -->
+    <div id="helpModal" class="help-modal">
+        <div class="help-content-card">
+            <h2>Manual Técnico de Operación</h2>
+            
+            <h3>1. Sistema de Captura de Imagen</h3>
+            <p>Permite ingresar fotos al lienzo de trabajo de dos maneras integradas:</p>
+            <ul>
+                <li><strong>📷 Capturar Foto:</strong> Abre la cámara nativa en móviles con lente gran angular activo. En PC o escritorio abre el modal asíncrono con resolución FHD ($1920 \times 1080$).</li>
+                <li><strong>🖼️ Galería / Archivos:</strong> Abre el explorador de archivos del sistema operativo para cargar imágenes JPG, PNG o WebP previamente guardadas.</li>
+            </ul>
+
+            <h3>2. Corrección de Contorno Ergonómica (Trapezoide)</h3>
+            <p>Diseñado especialmente para pantallas táctiles. Los cuatro puntos tiradores de la homografía nacen con un resguardo hacia adentro del $10\%$, permitiendo calzar la yema del dedo detrás del nodo verde sin golpear los límites de la pantalla.</p>
+            <svg class="graphic-canvas-container" style="padding: 15px;">
+                <rect x="25" y="15" width="130" height="70" rx="6" fill="#e2e8f0" stroke="#cbd5e1" stroke-width="1"/>
+                <polygon points="40,25 140,28 130,75 50,70" fill="rgba(37,211,102,0.15)" stroke="#25D366" stroke-width="2" stroke-dasharray="3"/>
+                <circle cx="40" cy="25" r="7" fill="#25D366" stroke="#fff" stroke-width="2"/>
+                <circle cx="140" cy="28" r="7" fill="#25D366" stroke="#fff" stroke-width="2"/>
+                <circle cx="130" cy="75" r="7" fill="#25D366" stroke="#fff" stroke-width="2"/>
+                <circle cx="50" cy="70" r="7" fill="#25D366" stroke="#fff" stroke-width="2"/>
+                <text x="180" y="45" fill="#334155" font-size="12px" font-weight="700">Margen del 10%</text>
+                <text x="180" y="62" fill="#64748b" font-size="11px">Evita bloqueos en los bordes</text>
+                <text x="180" y="76" fill="#64748b" font-size="11px">del dispositivo móvil</text>
+            </svg>
+
+            <h3>3. Procesamiento y Recorte Avanzado (OpenCV.js)</h3>
+            <p>Al presionar <strong>"Aplicar Recorte y Alinear Perspectiva"</strong>, el motor matemático calcula una matriz de transformación homográfica. Estira y endereza el área delimitada, eliminando sombras y deformaciones angulares de la perspectiva de la toma original de forma instantánea.</p>
+
+            <h3>4. Modo Frente-Reverso Unificado e Isotrópico</h3>
+            <p>Permite acoplar las dos caras de un documento (DNI, registro, tarjetas) de manera prolija:</p>
+            <ul>
+                <li><strong>Paso 1:</strong> Recortás la Cara A (Frente). La app conmutará al slot de la Cara B automáticamente.</li>
+                <li><strong>Paso 2:</strong> Sacás la foto de la Cara B (Reverso) y aplicás el recorte de contorno.</li>
+                <li><strong>Normalización Rígida:</strong> El algoritmo fuerza a que ambas caras adopten exactamente el mismo ancho matemático en píxeles y milímetros, atrayéndose hacia la línea media horizontal de la hoja para un acabado de impresión simétrico.</li>
+            </ul>
+            <svg class="graphic-canvas-container" style="padding: 10px; height: 110px;">
+                <rect x="70" y="8" width="110" height="36" rx="4" fill="#64748b" opacity="0.15"/>
+                <rect x="70" y="54" width="110" height="36" rx="4" fill="#64748b" opacity="0.15"/>
+                <line x1="10" y1="49" x2="240" y2="49" stroke="#007bff" stroke-width="1.5" stroke-dasharray="4"/>
+                <text x="195" y="30" fill="#334155" font-size="11px" font-weight="700">Anchos Idénticos</text>
+                <text x="195" y="76" fill="#007bff" font-size="11px" font-weight="700">Unión Central (50%)</text>
+            </svg>
+
+            <h3>5. Reglas de Medición CAD con Cero Flotante</h3>
+            <p>El sistema proyecta una cruz de retícula azul en la vista previa. Al hacer clic o arrastrar el dedo, se congela el origen en esas coordenadas fijando el punto $(0,0)$. La numeración métrica milimetrada de las reglas se desfasa dinámicamente indicando la distancia lineal exacta en centímetros reales hacia cualquier extremo perimetral de la carilla.</p>
+
+            <h3>6. Cola de Trabajo Continuo</h3>
+            <p>El botón verde <strong>"Confirmar y Escanear Siguiente Documento"</strong> consolida la hoja editada en la cola inferior del proyecto, vacía la caché volátil y resetea la interfaz de la cámara para que puedas meter el siguiente documento al vuelo sin mezclar datos.</p>
+
+            <h2 style="margin-top:25px;">Términos, Condiciones y Propiedad Intelectual</h2>
+            <p style="font-size:11px; text-align: justify;">
+                El presente software, denominado de forma comercial como <strong>DS Scanner PDF Pro 100% Local</strong>, incluyendo su código fuente, arquitectura lógica, estilos de maquetación CSS, implementaciones asíncronas de OpenCV/jsPDF y elementos vectoriales de interfaz, constituye una obra intelectual protegida íntegramente por las leyes de propiedad intelectual de la República Argentina (Ley 11.723 de Propiedad Intelectual) y por los tratados internacionales en la materia, incluyendo el Convenio de Berna para la Protección de las Obras Literarias y Artísticas y el Tratado de la OMPI sobre Derecho de Autor.
+            </p>
+            <p style="font-size:11px; text-align: justify;">
+                Queda expresamente prohibida la reproducción total o parcial, copia, distribución, comunicación pública, transformación, explotación comercial, compilación o realización de procesos de ingeniería inversa sobre el código fuente de esta aplicación sin el consentimiento previo, expreso y por escrito de <strong>Dani Soft Argentina (2026)</strong>. El uso no autorizado de estos activos de software dará lugar al inicio inmediato de las acciones civiles y penales correspondientes bajo las normativas nacionales e internacionales vigentes.
+            </p>
+            <p style="font-size:11px; text-align: justify;">
+                <strong>Garantía de Privacidad Local:</strong> Este software opera bajo un entorno estricto de ejecución del lado del cliente. Ningún algoritmo realiza peticiones web salientes ni almacena imágenes o metadatos de documentos escaneados en servidores remotos externos, garantizando el cumplimiento absoluto de los estándares internacionales de confidencialidad y protección de datos sensibles.
+            </p>
+            
+            <button onclick="cerrarManualAyudaTecnica()" style="width:100%; background:#1e293b; color: white; padding: 12px; font-weight: bold; border-radius: 8px; border:none; margin-top:15px; cursor:pointer;">Cerrar Manual Técnico</button>
+        </div>
+    </div>
+
     <script>
         const { jsPDF } = window.jspdf;
         let documentoHojas = [];
@@ -236,12 +397,27 @@
         let localStream = null;
         let puntoCeroFijo = null;
 
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => { omitirSplashScreenInmediato(); }, 2000);
+        });
+
+        function omitirSplashScreenInmediato() {
+            const splash = document.getElementById('appSplashScreen');
+            if (splash) {
+                splash.style.opacity = '0';
+                setTimeout(() => { splash.style.display = 'none'; }, 500);
+            }
+        }
+
         document.getElementById('opencv-src').addEventListener('load', () => { openCvListo = true; document.getElementById('cvLoading').style.display = "none"; });
 
         const cameraInput = document.getElementById('cameraInput');
         const galleryInput = document.getElementById('galleryInput');
         cameraInput.addEventListener('change', (e) => registrarArchivosMesa(e.target.files));
         galleryInput.addEventListener('change', (e) => registrarArchivosMesa(e.target.files));
+
+        function abrirManualAyudaTecnica() { document.getElementById('helpModal').style.display = "flex"; }
+        function cerrarManualAyudaTecnica() { document.getElementById('helpModal').style.display = "none"; }
 
         function dispararCamaraDispositivo() { if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) { cameraInput.click(); } else { abrirWebcamPC(); } }
         async function abrirWebcamPC() { const modal = document.getElementById('cameraModal'); const video = document.getElementById('videoStream'); try { localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } }); video.srcObject = localStream; modal.style.display = "flex"; } catch (err) { alert("Sin acceso a la cámara."); } }
@@ -543,7 +719,8 @@
             let cmActualY = (yCursor / mockHeight) * totalCmY;
 
             let hRuler = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-            hRuler.setAttribute("x", "0"); hRuler.setAttribute("y", "0"); hRuler.setAttribute("width", mockWidth); hRuler.setAttribute("height", "22");
+            hRuler.setAttribute("x", "0"); hRuler.setAttribute("y", "0");
+            hRuler.setAttribute("width", mockWidth); hRuler.setAttribute("height", "22");
             hRuler.setAttribute("style", "fill:rgba(18, 27, 34, 0.85); stroke:rgba(255,255,255,0.1);");
             svg.appendChild(hRuler);
 
@@ -755,19 +932,6 @@
             mock.ondblclick = function() { puntoCeroFijo = null; actualizarPrevisualizadorGlobal(null); };
         }
 
-        function manejarCambioOrientacionYDimensiones() {
-            actualizarPrevisualizadorGlobal(null);
-            setTimeout(() => { if (indiceActivo !== -1) dibujarPoligonoSVG((ranuraActiva === 'frente') ? documentoHojas[indiceActivo].corners : documentoHojas[indiceActivo].cornersDorso); }, 150);
-            if (window.innerHeight < window.innerWidth && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-                if (!document.fullscreenElement) { document.documentElement.requestFullscreen().catch(() => {}); }
-            } else {
-                if (document.fullscreenElement) { document.exitFullscreen().catch(() => {}); }
-            }
-        }
-
-        window.addEventListener('resize', manejarCambioOrientacionYDimensiones);
-        window.addEventListener('orientationchange', manejarCambioOrientacionYDimensiones);
-
         document.getElementById('btnExportar').addEventListener('click', async () => {
             const btn = document.getElementById('btnExportar'); btn.innerText = "Compilando..."; btn.disabled = true;
             let pdf = null;
@@ -802,9 +966,9 @@
                         }
 
                         let posX = (pdfW - targetW) / 2;
-                        let centroPapelY = pdfH / 2;
-                        let posYFrente = centroPapelY - altoFrenteMm - 2;
-                        let posYDorso = centroPapelY + 2;
+                        let centroPaperY = pdfH / 2;
+                        let posYFrente = centroPaperY - altoFrenteMm - 2;
+                        let posYDorso = centroPaperY + 2;
 
                         pdf.addImage(hoja.src, 'JPEG', posX, posYFrente, targetW, altoFrenteMm);
                         pdf.addImage(hoja.srcDorso, 'JPEG', posX, posYDorso, targetW, altoDorsoMm);
@@ -827,9 +991,6 @@
                 }
             }
 
-            // =========================================================================
-            // LÓGICA DE NOMBRE DINÁMICO CRONOLÓGICO ("DS_Scaner_Pro_AAAAMMDDHHMMSS.pdf")
-            // =========================================================================
             const ahora = new Date();
             const anio = ahora.getFullYear();
             const mes = String(ahora.getMonth() + 1).padStart(2, '0');
